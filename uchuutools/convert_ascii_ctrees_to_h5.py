@@ -183,8 +183,9 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     if ntrees <= 0:
         msg = f"[Rank={rank}] Error: ntrees = {ntrees} should be >= 0"
         raise AssertionError(msg)
-    print(f"[Rank={rank}]: processing {forest_info['Input_ForestNbytes'].sum()}"
-          f"bytes (in {ntrees} trees) spread over {nforests} forests...")
+    totnbytes = forest_info['Input_ForestNbytes'].sum()
+    print(f"[Rank={rank}]: processing {totnbytes} bytes "
+          f"(in {ntrees} trees) spread over {nforests} forests...")
 
     alltreedatafiles = list(set(trees_and_locations['Filename']))
     assert len(alltreedatafiles) > 0
@@ -373,7 +374,8 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
 
         alltreedatafiles = list(set(trees_and_locations['Filename']))
         if use_pread:
-            filehandlers = {f: os.open(f, os.O_RDONLY) for f in alltreedatafiles}
+            filehandlers = {f: os.open(f, os.O_RDONLY)
+                            for f in alltreedatafiles}
         else:
             filehandlers = {f: io.open(f, 'rt') for f in alltreedatafiles}
 
@@ -442,7 +444,8 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
             # Need to write to disk
             # Resize to make sure there is enough space to append the new halos
             if halos_offset > dset_size:
-                resize_halo_datasets(halos_dset, halos_offset, write_halo_props_cont, output_dtype)
+                resize_halo_datasets(halos_dset, halos_offset,
+                                     write_halo_props_cont, output_dtype)
                 dset_size = halos_offset
 
             # write the halos that are already in the buffer
@@ -485,7 +488,8 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         # All the trees for this call have now been read in entirely -> Now
         # fix the actual dataset sizes to reflect the total number of
         # halos written
-        resize_halo_datasets(halos_dset, halos_offset, write_halo_props_cont, output_dtype)
+        resize_halo_datasets(halos_dset, halos_offset,
+                             write_halo_props_cont, output_dtype)
 
         # all halos from all forests have been written out and the halo
         # dataset has been correctly resized. Now write the aggregate
@@ -512,8 +516,8 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     totnumhalos = halos_offset
 
     t1 = time.perf_counter()
-    print(f"[Rank {rank}]: processing {forest_info['Input_ForestNbytes'].sum()}"
-          f" bytes (in {ntrees} trees) spread over {nforests} forests...done. "
+    print(f"[Rank {rank}]: processing {totnbytes} bytes "
+          f"(in {ntrees} trees) spread over {nforests} forests...done. "
           f"Wrote {totnumhalos} halos in {t1-tstart:.2f} seconds")
 
     sys.stdout.flush()
@@ -578,7 +582,8 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
 
         ``drop_fields`` is processed after ``fields``, i.e., you can specify
         ``fields=None`` to create an initial list of *all* columns in the
-        ascii file, and then specify ``drop_fields = [colname2, colname7, ...]``,
+        ascii file, and then specify
+        ``drop_fields = [colname2, colname7, ...]``,
         and *only* those columns will not be present in the hdf5 output.
 
     truncate: boolean, default: True
@@ -623,7 +628,6 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
     import sys
     import time
     import numpy as np
-    import h5py
 
     rank = 0
     ntasks = 1
@@ -663,9 +667,10 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
         #  -> associated locations.dat file is called '<prefix>.loc'
         #
 
-        # If all files supplied at the command-line endwith '.tree(.bz2,.zip,.gz)' then
-        # it is a parallel Consistent-Trees run.
-        check_pctrees_files = [True if 'tree' in set(f.split('.')) else False for f in filenames]
+        # If all files supplied at the command-line endwith
+        # '.tree(.bz2,.zip,.gz)' then it is a parallel Consistent-Trees run.
+        check_pctrees_files = [True if 'tree' in set(f.split('.'))
+                               else False for f in filenames]
         if np.all(check_pctrees_files):
             standard_consistent_trees = False
 
@@ -710,8 +715,9 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
             forests_file, locations_file, _ = get_all_parallel_ctrees_filenames(decomp_fname)
             forests_and_locations_fnames.append((forests_file, locations_file))
 
-        # Since multiple tree files are specified at the command-line, let's make
-        # sure that all the files belong to the same simulation + mergertree setup
+        # Since multiple tree files are specified at the command-line,
+        # let's make sure that all the files belong to the
+        # same simulation + mergertree setup
         assert len(decompressed_filenames) > 0
         validate_inputs_are_ctrees_files(decompressed_filenames)
 
@@ -722,14 +728,16 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
 
     nfiles = len(forests_and_locations_fnames)
     if rank == 0:
-        print(f"[Rank={rank}]: Converting {nfiles} sets of (forests, locations) "\
-              f"files over {ntasks} tasks ... ")
+        print(f"[Rank={rank}]: Converting {nfiles} sets of (forests, "
+              f"locations) files over {ntasks} tasks ... ")
 
     nconverted = 0
     for (forests_file, locations_file) in forests_and_locations_fnames:
         t0 = time.perf_counter()
         print(f"[Rank={rank}]: Reading forests and locations files...")
-        trees_and_locations = read_locations_and_forests(forests_file, locations_file, rank)
+        trees_and_locations = read_locations_and_forests(forests_file,
+                                                         locations_file,
+                                                         rank)
         ntrees = trees_and_locations.shape[0]
         t1 = time.perf_counter()
         print(f"[Rank={rank}]: Reading forests and locations files...done. "
