@@ -690,39 +690,3 @@ def update_container_h5_file(fname, h5files,
 
             hf[f'File{ifile}'] = h5py.ExternalLink(outfile, '/')
     return
-
-
-# # Taken from https://stackoverflow.com/a/53507580
-# # UNTESTED! -- MS 16/06/2020
-# def better_np_unique(arr):
-#     import numpy as np
-#     sort_indexes = np.argsort(arr)
-#     arr = np.asarray(arr)[sort_indexes]
-#     vals, first_indexes, inverse, counts = \
-#         np.unique(arr, return_index=True,
-#                   return_inverse=True, return_counts=True)
-#     indexes = np.split(sort_indexes, first_indexes[1:])
-#     for x in indexes:
-#         x.sort()
-#     return vals, indexes, inverse, counts
-
-# Another untested option: https://stackoverflow.com/a/54736464
-# def ndix_unique(x):
-#     """
-#     Returns an N-dimensional array of indices
-#     of the unique values in x
-#     ----------
-#     x: np.array
-#        Array with arbitrary dimensions
-#     Returns
-#     -------
-#     - 1D-array of sorted unique values
-#     - Array of arrays. Each array contains the indices where a
-#       given value in x is found
-#     """
-#     x_flat = x.ravel()
-#     ix_flat = np.argsort(x_flat)
-#     u, ix_u = np.unique(x_flat[ix_flat], return_index=True)
-#     ix_ndim = np.unravel_index(ix_flat, x.shape)
-#     ix_ndim = np.c_[ix_ndim] if x.ndim > 1 else ix_flat
-#     return u, np.split(ix_ndim, ix_u[1:])
