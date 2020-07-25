@@ -1,11 +1,16 @@
-#!/usr/bin/env python
-from __future__ import print_function
+# -*- coding: utf-8 -*-
+
+"""
+General Utilities
+==================
+Provides several utility functions.
+"""
 
 __author__ = "Manodeep Sinha"
-__all__ = ("get_parser", "get_approx_totnumhalos", "generic_reader",
+__all__ = ["get_parser", "get_approx_totnumhalos", "generic_reader",
            "get_metadata", "resize_halo_datasets",
            "check_and_decompress", "distribute_array_over_ntasks",
-           "write_halos", "update_container_h5_file", )
+           "write_halos", "update_container_h5_file", ]
 
 
 # Majority of the code below is taken from
@@ -645,15 +650,39 @@ def write_halos(halos_dset, halos_dset_offset, halos, nhalos_to_write,
 
 
 def update_container_h5_file(fname, h5files,
-                             standard_consistent_trees=False,
-                             write_halo_props_cont=True,
-                             rank=0):
-    import h5py
+                             standard_consistent_trees=True):
+    """
+    Writes the container hdf5 file that has external links to
+    the hdf5 datafiles with the mergertree information.
 
-    if rank != 0:
-        print("Warning: This container file '{fname}' should only be "
-              f"created on rank == 0 (was called on rank={rank})")
-        return
+    Parameters
+    -----------
+
+    fname: string, required
+        The name of the output container file (usually ``forest.h5``). A
+        new file is always created, however, if the file ``fname`` previously
+        existed then the external links are preserved.
+
+    h5files: list of filenames, required
+        The list of filenames that were either newly created or updated.
+
+        If the container file ``fname`` exists, then the union of the filenames
+        that already existed in ``fname`` and ``h5files`` will be used to
+        create the external links
+
+    standard_consistent_tree: boolean, optional, default: True
+        Specifies whether the input files were from a parallel
+        Consistent-Trees code or the standard Consistent-Trees code. Assumed
+        to be standard (i.e., the public version) of the Consistent-Trees
+        catalog
+
+    Returns
+    -------
+
+    Returns ``True`` on successful completion of the write
+
+    """
+    import h5py
 
     outfiles = h5files
     if not isinstance(h5files, (list, tuple)):
@@ -684,7 +713,6 @@ def update_container_h5_file(fname, h5files,
                     hf_task.attrs['consistent-trees-type'] = 'standard'
                 else:
                     hf_task.attrs['consistent-trees-type'] = 'parallel'
-                hf_task.attrs['contiguous-halo-props'] = write_halo_props_cont
                 for (out, inp) in attr_props:
                     hf['/'].attrs[out] += hf_task['/'].attrs[inp]
 

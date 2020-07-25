@@ -2,19 +2,19 @@
 from __future__ import print_function
 
 __author__ = "Manodeep Sinha"
-__all__ = ["convert_single_ascii_halocat", "convert_ascii_halocat_files"]
+__all__ = ["convert_halocat_to_h5"]
 
 import os
 
-from uchuu_utils import get_parser, get_approx_totnumhalos, generic_reader,\
-                        get_metadata, resize_halo_datasets, write_halos
+from ..utils import get_parser, get_approx_totnumhalos, generic_reader,\
+                    get_metadata, resize_halo_datasets, write_halos
 
 
-def convert_single_ascii_halocat(input_file, rank=0,
-                                 outputdir="./", write_halo_props_cont=True,
-                                 fields=None, drop_fields=None,
-                                 chunksize=10000, compression='gzip',
-                                 show_progressbar=False):
+def _convert_single_halocat(input_file, rank=0,
+                            outputdir="./", write_halo_props_cont=True,
+                            fields=None, drop_fields=None,
+                            chunksize=10000, compression='gzip',
+                            show_progressbar=False):
     """
     Convert a single Rockstar/Consistent Trees (an hlist catalogue) file
     into an (optionally compressed) hdf5 file.
@@ -161,12 +161,13 @@ def convert_single_ascii_halocat(input_file, rank=0,
             # for halos will be written contiguously
             # (structure of arrays)
             for name, dtype in parser.dtype.descr:
-                halos_dset[name] = halos_grp.create_dataset(name,
-                                                            (dset_size, ),
-                                                            dtype=dtype,
-                                                            chunks=True,
-                                                            compression=compression,
-                                                            maxshape=(None,))
+                halos_dset[name] = \
+                    halos_grp.create_dataset(name,
+                                             (dset_size, ),
+                                             dtype=dtype,
+                                             chunks=True,
+                                             compression=compression,
+                                             maxshape=(None,))
         else:
             # Create a single dataset that contains all properties
             # of a given halo, then all properties of the next halo,
@@ -214,7 +215,8 @@ def convert_single_ascii_halocat(input_file, rank=0,
 
         # The ascii file has now been read in entirely -> Now fix the actual
         # dataset sizes to reflect the total number of halos written
-        resize_halo_datasets(halos_dset, halos_offset, write_halo_props_cont, parser.dtype)
+        resize_halo_datasets(halos_dset, halos_offset,
+                             write_halo_props_cont, parser.dtype)
         dset_size = halos_offset
 
         hf.attrs['TotNhalos'] = halos_offset
@@ -229,11 +231,11 @@ def convert_single_ascii_halocat(input_file, rank=0,
     return True
 
 
-def convert_ascii_halocat_files(filenames, outputdir="./",
-                                write_halo_props_cont=True,
-                                fields=None, drop_fields=None,
-                                chunksize=100000, compression='gzip',
-                                comm=None, show_progressbar=False):
+def convert_halocat_to_h5(filenames, outputdir="./",
+                          write_halo_props_cont=True,
+                          fields=None, drop_fields=None,
+                          chunksize=100000, compression='gzip',
+                          comm=None, show_progressbar=False):
 
     """
     Converts a list of Rockstar/Consistent-Trees halo catalogues from
@@ -321,14 +323,14 @@ def convert_ascii_halocat_files(filenames, outputdir="./",
     # and inclusive of [nfiles-1]. That is, the range [0, nfiles-1]
     # will be uniquely distributed over ntasks.
     for filenum in range(rank, nfiles, ntasks):
-        convert_single_ascii_halocat(filenames[filenum], rank,
-                                     outputdir=outputdir,
-                                     write_halo_props_cont=write_halo_props_cont,
-                                     fields=fields,
-                                     drop_fields=drop_fields,
-                                     chunksize=chunksize,
-                                     compression=compression,
-                                     show_progressbar=show_progressbar)
+        _convert_single_halocat(filenames[filenum], rank,
+                                outputdir=outputdir,
+                                write_halo_props_cont=write_halo_props_cont,
+                                fields=fields,
+                                drop_fields=drop_fields,
+                                chunksize=chunksize,
+                                compression=compression,
+                                show_progressbar=show_progressbar)
 
     # The barrier is only essential so that the total time printed
     # out on rank==0 is correct.
@@ -372,6 +374,6 @@ if __name__ == "__main__":
     # The entire list of filenames to be converted should
     # be passed at the command-line
     filenames = sys.argv[2:]
-    convert_ascii_halocat_files(filenames, outputdir=outputdir,
-                                write_halo_props_cont=write_halo_props_cont,
-                                comm=comm)
+    convert_halocat_to_h5(filenames, outputdir=outputdir,
+                          write_halo_props_cont=write_halo_props_cont,
+                          comm=comm)

@@ -3,7 +3,8 @@
 """
 Setup file for the uchuutools package.
 
-(setup.py taken from the 1313e/e13Tools package)
+(setup.py and most package setup details are
+adapted from the 1313e/e13Tools package)
 """
 
 

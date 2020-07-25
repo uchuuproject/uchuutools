@@ -2,23 +2,23 @@
 from __future__ import print_function
 
 __author__ = "Manodeep Sinha"
-__all__ = ["convert_ctrees_files"]
+__all__ = ["convert_ctrees_to_h5"]
 
 import os
 import time
 import io
 
-from utils import get_metadata, get_parser, \
-                  distribute_array_over_ntasks, get_approx_totnumhalos, \
-                  check_and_decompress, resize_halo_datasets, write_halos, \
-                  update_container_h5_file
+from ..utils import get_metadata, get_parser, \
+                    distribute_array_over_ntasks, get_approx_totnumhalos, \
+                    check_and_decompress, resize_halo_datasets, write_halos, \
+                    update_container_h5_file
 
-from ctrees_utils import read_locations_and_forests, \
-                         get_aggregate_forest_info,\
-                         get_all_parallel_ctrees_filenames, \
-                         validate_inputs_are_ctrees_files, \
-                         check_forests_locations_filenames, \
-                         get_treewalk_dtype_descr, add_tree_walk_indices
+from ..ctrees_utils import read_locations_and_forests, \
+                           get_aggregate_forest_info,\
+                           get_all_parallel_ctrees_filenames, \
+                           validate_inputs_are_ctrees_files, \
+                           check_forests_locations_filenames, \
+                           get_treewalk_dtype_descr, add_tree_walk_indices
 
 
 def _create_and_validate_halos_dset(hf, dtype, write_halo_props_cont=True):
@@ -228,6 +228,8 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
             hf.attrs[f"{input_catalog_type}_version"] = np.string_(version_info)
             hf.attrs[f"{input_catalog_type}_columns"] = np.string_(hdrline)
             hf.attrs[f"{input_catalog_type}_metadata"] = np.string_(metadata)
+            hf.attrs['contiguous-halo-props'] = write_halo_props_cont
+
             sim_grp = hf.create_group('simulation_params')
             simulation_params = metadata_dict['simulation_params']
             for k, v in simulation_params.items():
@@ -524,7 +526,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     return True
 
 
-def convert_ctrees_files(filenames, standard_consistent_trees=None,
+def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
                          outputdir="./", output_filebase="forest",
                          write_halo_props_cont=True,
                          fields=None, drop_fields=None,
@@ -546,12 +548,8 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
         parallel Consistent-Trees code. If only two files are specified in
         ``filenames``, and these two filenames end with 'forests.list', and
         'locations.dat', then a standard Consistent-Trees output will be
-        inferred. By default, a parallel Consistent-Trees output
-        is used
-        files are specified in
-
-        all files specified in ``filenames``
-        end with '.tree', then
+        inferred. If all files specified in ``filenames`` end with '.tree',
+        then parallel Consistent-Trees is inferred.
 
     outputdir: string, optional, default: current working directory ('./')
         The directory where the converted hdf5 file will be written in. The
@@ -830,7 +828,6 @@ def convert_ctrees_files(filenames, standard_consistent_trees=None,
                 for itask in range(ntasks)]
     update_container_h5_file(fname, outfiles,
                              standard_consistent_trees,
-                             write_halo_props_cont,
                              rank)
 
     t1 = time.perf_counter()
@@ -891,6 +888,6 @@ if __name__ == "__main__":
         print(helpmsg)
         raise e
 
-    convert_ctrees_files(args.filenames, outputdir=args.outputdir,
+    convert_ctrees_to_h5(args.filenames, outputdir=args.outputdir,
                          write_halo_props_cont=args.write_halo_props_cont,
                          show_progressbar=args.show_progressbar)
