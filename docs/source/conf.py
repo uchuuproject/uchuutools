@@ -144,7 +144,7 @@ html_last_updated_fmt = '%a %d %b %Y'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-#html_static_path = ['_static']
+# html_static_path = ['_static']
 
 # OpenSearch. Requires documentation to be online.
 html_use_opensearch = 'https://uchuutools.readthedocs.io/en/latest'
@@ -215,8 +215,10 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, project, html_title,
-     author, project, ("A python package for converting the raw simulation data products "
-                       "into more user-friendly datasets. Created by @manodeep for the Uchuu Project"),
+     author, project, ("A python package for converting the raw "
+                       "simulation data products into more user-friendly "
+                       "datasets. Created by Manodeep Sinha (@manodeep) "
+                       "for the Uchuu Project"),
      'Miscellaneous'),
 ]
 
