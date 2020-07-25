@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.pypirc
 build/
 develop-eggs/
 dist/
@@ -102,3 +103,6 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# emacs backup files
+*.*~
