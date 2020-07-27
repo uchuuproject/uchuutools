@@ -1,7 +1,10 @@
-*uchuutools*; a collection of utility functions
-===============================================
+*uchuutools*; a python package for converting dark matter halo catalogues and mergertrees
+==========================================================================================
 
-This is the documentation for the *uchuutools* package, a python package for converting the raw simulation data products into more user-friendly datasets. The package was created by Manodeep Sinha `@manodeep`_ as part of the `Uchuu Project`_. It is written in pure `Python 3`_ and `publicly available on GitHub`_.
+This is the documentation for the *uchuutools* package, a python package for
+converting ascii simulation data products into more user-friendly datasets. The
+package was created by Manodeep Sinha `@manodeep`_ as part of the `Uchuu
+Project`_. *uchuutools* is written in pure `Python 3`_ and `publicly available on GitHub`_.
 
 .. _@manodeep: https://github.com/manoodeep
 .. _Python 3: https://www.python.org
