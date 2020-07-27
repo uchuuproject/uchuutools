@@ -15,7 +15,7 @@ Available modules
     imported automatically.
 
 :mod:`~ctrees_utils`
-    Provides a collection of functions useful in manipulating *NumPy* arrays.
+    Provides a collection of functions useful in manipulating *Consistent-Trees* catalogues.
 
 :mod:`~utils`
     Provides several useful utility functions.
@@ -30,7 +30,7 @@ from . import converters, ctrees_utils, utils
 from .converters import *
 
 # All declaration
-__all__ = ['converters', 'utils', 'ctrees_utils']
+__all__ = ['converters', 'ctrees_utils', 'utils']
 __all__.extend(converters.__all__)
 
 # Author declaration
