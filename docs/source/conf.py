@@ -215,7 +215,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, project, html_title,
-     author, project, ("A python package for converting the raw "
+     author, project, ("A python package for converting ascii "
                        "simulation data products into more user-friendly "
                        "datasets. Created by Manodeep Sinha (@manodeep) "
                        "for the Uchuu Project"),
