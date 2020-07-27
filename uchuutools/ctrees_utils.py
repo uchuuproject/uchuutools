@@ -653,7 +653,13 @@ def get_treewalk_dtype_descr():
 
 def add_tree_walk_indices(forest, rank=0):
     """
-    Adds the various mergertree walking indices
+    Adds the various mergertree walking indices and IDs.
+    These include indices to access the host FOF halo<->subhalo
+    hierarchy, and the progenitor-descendant hierarchy.
+
+    The mergertree indices are filled in-place and no additional
+    return occurs. The specific indices are listed
+    in the function :func:`get_treewalk_dtype_descr`
 
     Parameters
     -----------
@@ -668,10 +674,7 @@ def add_tree_walk_indices(forest, rank=0):
     Returns
     --------
 
-    None
-        The mergertree indices are filled in-place and no additional
-        return occurs
-
+    True on successful completion
     """
     import numpy as np
 
@@ -769,4 +772,4 @@ def add_tree_walk_indices(forest, rank=0):
         forest['NextProgenitor'][lhs] = [*lhs[1:], -1]
         forest['PrevProgenitor'][lhs] = [-1, *lhs[0:-1]]
 
-    return
+    return True

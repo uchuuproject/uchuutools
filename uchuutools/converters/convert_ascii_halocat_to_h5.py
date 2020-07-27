@@ -343,37 +343,3 @@ def convert_halocat_to_h5(filenames, outputdir="./",
               f"{ntasks}...done. Time taken = {t1-tstart:0.2f} seconds")
 
     return True
-
-
-if __name__ == "__main__":
-    import sys
-
-    try:
-        from mpi4py import MPI
-        comm = MPI.COMM_WORLD
-    except ImportError:
-        comm = None
-
-    # Do we want to write each halo as a struct (i.e., ALL the
-    # properties of any given halo are written together), or do we want
-    # to write out individual datasets for each of the
-    # halo properties (i.e., any given property of ALL halos are written
-    # together)
-    # True -> structure of arrays, # False-> array of structures
-    write_halo_props_cont = True
-
-    if len(sys.argv) < 3:
-        print("Error: Please provide at least two command-line arguments")
-        print("First argument -- <output directory>")
-        print("Second (and all following arguments) -- "
-              "<input filenames to convert>")
-        sys.exit(1)
-
-    outputdir = sys.argv[1]
-
-    # The entire list of filenames to be converted should
-    # be passed at the command-line
-    filenames = sys.argv[2:]
-    convert_halocat_to_h5(filenames, outputdir=outputdir,
-                          write_halo_props_cont=write_halo_props_cont,
-                          comm=comm)

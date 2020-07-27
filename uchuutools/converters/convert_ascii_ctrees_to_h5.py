@@ -532,6 +532,7 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
                          fields=None, drop_fields=None,
                          truncate=True, compression='gzip',
                          buffersize=None, use_pread=True,
+                         max_nforests=None,
                          comm=None, show_progressbar=False):
     """
     Convert a set of forests from Consistent Trees ascii file(s) into an
@@ -608,6 +609,12 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
         Since ``pread`` does not change the file offset, additional
         parallelisation can be implemented reasonably easily.
 
+    max_nforests: integer >= 1, optional, default: None
+        The maximum number of forests to convert across all tasks. If a
+        positive value is passed then the total number of forests converted
+        will be ``min(totnforests, max_nforests)``. ValueError is raised
+        if the passed parameter value is less than 1.
+
     comm: MPI communicator, optional, default: None
         Controls whether the conversion is run in MPI parallel. Should be
         compatible with `mpi4py.MPI.COMM_WORLD`.
@@ -635,6 +642,11 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
 
     if not os.path.isdir(outputdir):
         msg = f"Error: Output directory = {outputdir} is not a valid directory"
+        raise ValueError(msg)
+
+    if max_nforests and max_nforests <= 0:
+        msg = f"Error: The maximum number of forests to convert "\
+              f"= {max_nforests} must be >= 1"
         raise ValueError(msg)
 
     tstart = time.perf_counter()
@@ -770,10 +782,11 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
         # the forests (by grouping trees by ForestID)
         forest_info = get_aggregate_forest_info(trees_and_locations, rank)
 
-        # If you need to convert the initial subset of trees
-        # then just uncomment the following two lines -- MS 22/06/2020
-        # nforests = 50000
-        # forest_info = forest_info[0:nforests]
+        # If `max_nforests` was passed, then we convert at most
+        # the first `max_nforests`  -- MS 27/07/2020
+        if max_nforests:
+            nforests = min(max_nforests, forest_info.shape[0])
+            forest_info = forest_info[0:nforests]
 
         # Distribute the forests over ntasks
         (forest_start, forest_stop) = distribute_array_over_ntasks(forest_info['Input_ForestNbytes'], rank, ntasks)
@@ -835,59 +848,3 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
           f"over {ntasks} tasks ...done. Time taken = {t1-tstart:.2f} seconds")
 
     return True
-
-
-if __name__ == "__main__":
-    import argparse
-    helpmsg = "\nUsage Scenario 1:\n"
-    helpmsg += "-----------------\n"
-    helpmsg += "If you are converting the output of the standard "\
-               "Consistent-Trees code, then \nplease provide the "\
-               "full-path to the 'forests.list' and 'locations.dat'"\
-               "(order is unimportant).\n\n"
-    helpmsg += "Usage Scenario 2:\n"
-    helpmsg += "-----------------\n"
-    helpmsg += "If you are converting the output of the parallel "\
-               "Consistent-Trees code \nfrom the Uchuu collaboration, "\
-               "then please provide all the tree filenames \nthat "\
-               "you would like to convert (i.e., files ending with "\
-               "'<prefix>.tree').\nThe names for relevant "\
-               "'forests.list (<prefix>.forest)' and \n"\
-               "'locations.dat (<prefix>.loc)' will be "\
-               "automatically constructed.\n\n"
-    descr = "Convert ascii Consistent-Trees files into hdf5 "\
-            "(optionally in MPI parallel)"
-    parser = argparse.ArgumentParser(description=descr)
-    parser.add_argument('outputdir', metavar='<Output directory>', type=str,
-                        help='the output directory for the hdf5 file(s)')
-    parser.add_argument("filenames", metavar="<CTrees filenames>",
-                        type=str, nargs='+',
-                        help="list of input (ascii) Consistent-Trees "
-                             "filenames")
-    parser.add_argument("-p", "--progressbar", dest='show_progressbar',
-                        action="store_true", default=True,
-                        help="display a progressbar on rank=0")
-    # Do you want to write each halo as a struct (i.e., ALL the
-    # properties of any given halo are written together, array of structures),
-    # or do you want to write out individual datasets for each of the
-    # halo properties (i.e., any given property of ALL halos are written
-    # together, structure of arrays -> default)
-    # write_halo_props_cont = True     # True -> structure of arrays,
-    #                                  # False-> array of structures
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument("-m", "--multiple-dsets", dest='write_halo_props_cont',
-                       action="store_true", default=True,
-                       help="write a separate dataset for each halo property")
-    group.add_argument("-s", "--single-dset", dest='write_halo_props_cont',
-                       action="store_false", default=False,
-                       help="write a single dataset containing all "
-                            "halo properties")
-    try:
-        args = parser.parse_args()
-    except SystemExit as e:
-        print(helpmsg)
-        raise e
-
-    convert_ctrees_to_h5(args.filenames, outputdir=args.outputdir,
-                         write_halo_props_cont=args.write_halo_props_cont,
-                         show_progressbar=args.show_progressbar)
