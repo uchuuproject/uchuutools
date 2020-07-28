@@ -708,7 +708,7 @@ def update_container_h5_file(fname, h5files,
                       ('TotNtrees', 'Ntrees'),
                       ('TotNhalos', 'Nhalos')]
         for ifile, outfile in enumerate(outfiles):
-            with h5py.File(outfile, 'r') as hf_task:
+            with h5py.File(outfile, 'a') as hf_task:
                 if standard_consistent_trees:
                     hf_task.attrs['consistent-trees-type'] = 'standard'
                 else:
