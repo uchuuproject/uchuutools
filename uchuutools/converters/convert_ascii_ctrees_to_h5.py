@@ -840,8 +840,7 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
     outfiles = [f'{outputdir}/{output_filebase}_{itask}.h5'
                 for itask in range(ntasks)]
     update_container_h5_file(fname, outfiles,
-                             standard_consistent_trees,
-                             rank)
+                             standard_consistent_trees)
 
     t1 = time.perf_counter()
     print(f"Converting {nfiles} sets of (forests, locations) files "
