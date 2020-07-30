@@ -689,11 +689,10 @@ def update_container_h5_file(fname, h5files,
         outfiles = [h5files]
 
     try:
-        with h5py.File(fname, 'r') as hf:
-            nfiles = hf['/'].attrs
+        with h5py.File(fname, 'a') as hf:
+            nfiles = hf['/'].attrs['Nfiles']
             for ifile in range(nfiles):
                 outfiles.append(hf[f'File{ifile}'].file)
-                print(f"outfiles = {outfiles}")
     except OSError:
         pass
 
