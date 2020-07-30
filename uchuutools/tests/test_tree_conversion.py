@@ -6,9 +6,8 @@ __all__ = ["test_ctrees_conversion"]
 
 import numpy as np
 
-
-from ..utils import get_parser
-from ..ctrees_utils import get_treewalk_dtype_descr
+from uchuutools.utils import get_parser
+from uchuutools.ctrees_utils import get_treewalk_dtype_descr
 
 
 def _loadtree_from_offset(fp, offset, parser):
@@ -36,7 +35,7 @@ def _load_forest_columns(halo_props, starthalo, nhalos, columns):
 
 
 def _validate_forest_walk_indices(forest):
-    from numpy.testing import assert_array_equal, assert_array_less
+    from numpy.testing import assert_array_equal
 
     nhalos = forest.shape[0]
     # Check the primary tree-walking indices
@@ -49,13 +48,14 @@ def _validate_forest_walk_indices(forest):
     for fld in indices_fields:
         # these are all indices and therefore must be either -1
         # or have a value within [0, nhalos-1]
-        valid = np.where((forest[fld] == -1) |
-                         ((forest[fld] >= 0) & (forest[fld] < nhalos)))[0]
-        invalid = ~valid
-        if invalid:
-            msg = f"For field = {fld}. found values that are not "\
-                   "valid indices. Invalid values are {forest[fld][invalid]}"
-            raise AssertionError(msg)
+        valid = np.where(forest[fld] != -1)[0]
+        if len(valid) > 0:
+            msg = f"The min. {fld} index = {forest[fld][valid].min()} "\
+                  "should be >= 0"
+            assert forest[fld][valid].min() >= 0, msg
+            msg = f"The max. {fld} index = {forest[fld][valid].max()} "\
+                  f"should be < nhalos = {nhalos}"
+            assert forest[fld][valid].max() < nhalos, msg
 
     prop = 'FirstHaloInFOFgroup'
     fof_idx = forest[prop][:]
@@ -69,7 +69,7 @@ def _validate_forest_walk_indices(forest):
     msg = f"Error: The halos do not correctly point to the "\
           f"descendant halo. The ID of the halo pointed to by "\
           f"'{prop}' should match the 'desc_id'"
-    desc = forest['Descendant'][valid_desc]
+    desc = forest[prop][valid_desc]
     assert_array_equal(forest['id'][desc],
                        forest['desc_id'][valid_desc],
                        err_msg=msg)
@@ -83,9 +83,7 @@ def _validate_forest_walk_indices(forest):
     msg = "Error: The scale-factor of the descendant halo "\
           "should be larger than the scale-factor of the "\
           "progenitor halo. "
-    assert_array_less(forest['scale'][desc],
-                      forest['scale'][valid_desc],
-                      err_msg=msg)
+    assert np.min(forest['scale'][desc] - forest['scale'][valid_desc]) > 0, msg
 
     prop = 'FirstProgenitor'
     valid_first_prog = forest[prop][:] != -1
@@ -116,7 +114,7 @@ def _test_single_h5file(h5file, show_progressbar=True):
         if cont_halo_props:
             halo_props = dict()
             props = []
-            for name in hf['Forests'].keys():
+            for name in tqdm(hf['Forests'].keys()):
                 if not isinstance(hf[f"Forests/{name}"], h5py.Dataset):
                     continue
                 props.append(name)
