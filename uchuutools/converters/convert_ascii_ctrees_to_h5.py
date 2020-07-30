@@ -61,12 +61,12 @@ def _create_and_validate_halos_dset(hf, dtype, write_halo_props_cont=True):
 
 
 def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
-                                 outputdir="./", output_filebase="forest",
-                                 write_halo_props_cont=True,
-                                 fields=None, drop_fields=None,
-                                 truncate=True, compression='gzip',
-                                 buffersize=1024*1024, use_pread=True,
-                                 show_progressbar=False):
+                                 outputdir, output_filebase,
+                                 write_halo_props_cont,
+                                 fields, drop_fields,
+                                 truncate, compression,
+                                 buffersize, use_pread,
+                                 show_progressbar):
     """
     Convert a set of forests from Consistent Trees ascii file(s) into an
     (optionally compressed) hdf5 file.
@@ -88,15 +88,15 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         The (MPI) rank for the process. The output filename is determined
         with this rank to ensure unique filenames when running in parallel.
 
-    outputdir: string, optional, default: current working directory ('./')
+    outputdir: string, required
         The directory where the converted hdf5 file will be written in. The
         output filename is obtained by appending '.h5' to the ``input_file``.
 
-    output_filebase: string, optional, default: "forest"
+    output_filebase: string, required
         The output filename is constructed using
-        '<outputdir>/<output_filebase>_<rank>.h5'
+        '{outputdir}/{output_filebase}_{rank}.h5'
 
-    write_halo_props_cont: boolean, optional, default: True
+    write_halo_props_cont: boolean, required
         Controls if the individual halo properties are written as distinct
         datasets such that any given property for *all* halos is written
         contiguously (structure of arraysA).
@@ -105,39 +105,39 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         group 'Forests', and *all* properties of a halo is written out
         contiguously (array of structures).
 
-    fields: list of strings, optional, default: None
+    fields: list of strings, required
         Describes which specific columns in the input file to carry across
         to the hdf5 file. Default action is to convert ALL columns.
 
-    drop_fields: list of strings, optional, default: None
+    drop_fields: list of strings, required
         Describes which columns are not carried through to the hdf5 file.
         Processed after ``fields``, i.e., you can specify ``fields=None`` to
         create an initial list of *all* columns in the ascii file, and then
         specify ``drop_fields = [colname2, colname7, ...]``, and those columns
         will not be present in the hdf5 output.
 
-    truncate: boolean, default: True
+    truncate: boolean, required
         Controls whether a new file is created on this 'rank'. When set to
         ``True``, the header info file is written out. Otherwise, the file
         is appended to.
 
-    compression: string, optional, default: 'gzip'
+    compression: string, required
         Controls the kind of compression applied. Valid options are anything
         that ``h5py`` accepts.
 
-    buffersize: integer, optional, default: 1 MB
+    buffersize: integer, required
         Controls the size of the buffer for how many halos are written out
         per write call to the hdf5 file. The number of halos written out is
         this buffersize divided the size of the datatype for individual halos.
 
-    use_pread: boolean, optional, default: True
+    use_pread: boolean, optional, required
         Controls whether low-level i/o operations (through ``os.pread``) is
         used. Otherwise, higher-level i/o operations (via ``io.open``) is
         used. This option is only meaningful on linux systems (and python3+).
         Since ``pread`` does not change the file offset, additional
         parallelisation can be implemented reasonably easily.
 
-    show_progressbar: boolean, optional, default: False
+    show_progressbar: boolean, required
         Controls whether a progressbar is printed. Only enables progressbar
         on rank==0, the remaining ranks ignore this keyword.
 
@@ -558,7 +558,7 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
 
     output_filebase: string, optional, default: "forest"
         The output filename is constructed using
-        '<outputdir>/<output_filebase>_<rank>.h5'
+        '{outputdir}/{output_filebase}_{rank}.h5'
 
     write_halo_props_cont: boolean, optional, default: True
         Controls if the individual halo properties are written as distinct

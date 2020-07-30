@@ -10,11 +10,11 @@ from ..utils import get_parser, get_approx_totnumhalos, generic_reader,\
                     get_metadata, resize_halo_datasets, write_halos
 
 
-def _convert_single_halocat(input_file, rank=0,
-                            outputdir="./", write_halo_props_cont=True,
-                            fields=None, drop_fields=None,
-                            chunksize=10000, compression='gzip',
-                            show_progressbar=False):
+def _convert_single_halocat(input_file, rank,
+                            outputdir, write_halo_props_cont,
+                            fields, drop_fields,
+                            chunksize, compression,
+                            show_progressbar):
     """
     Convert a single Rockstar/Consistent Trees (an hlist catalogue) file
     into an (optionally compressed) hdf5 file.
@@ -26,16 +26,16 @@ def _convert_single_halocat(input_file, rank=0,
         The input filename for the Rockstar/Consistent Trees file. Can
         be a compressed (.gz, .bz2) file.
 
-    rank: integer, optional, default: 0
+    rank: integer, required
         The (MPI) rank for the process. The output filename is determined
         with this rank to ensure unique filenames when running in parallel.
 
-    outputdir: string, optional, default: current working directory ('./')
+    outputdir: string, required
         The directory where the converted hdf5 file will be written in. The
         output filename is obtained by appending '.h5' to the ``input_file``.
         If the output file already exists, then it will be truncated.
 
-    write_halo_props_cont: boolean, optional, default: True
+    write_halo_props_cont: boolean, required
         Controls if the individual halo properties are written as distinct
         datasets such that any given property for ALL halos is written
         contiguously (structure of arrays, SOA).
@@ -44,26 +44,26 @@ def _convert_single_halocat(input_file, rank=0,
         properties of a halo is written out contiguously (array of
         structures).
 
-    fields: list of strings, optional, default: None
+    fields: list of strings, required
         Describes which specific columns in the input file to carry across
         to the hdf5 file. Default action is to convert ALL columns.
 
-    drop_fields: list of strings, optional, default: None
+    drop_fields: list of strings, required
         Describes which columns are not carried through to the hdf5 file.
         Processed after ``fields``, i.e., you can specify ``fields=None`` to
         create an initial list of *all* columns in the ascii file, and then
         specify ``drop_fields = [colname2, colname7, ...]``, and those columns
         will not be present in the hdf5 output.
 
-    chunksize: integer, optional, default: 100000
+    chunksize: integer, required
         Controls how many lines are read in from the input file before being
         written out to the hdf5 file.
 
-    compression: string, optional, default: 'gzip'
+    compression: string, required
         Controls the kind of compression applied. Valid options are anything
         that ``h5py`` accepts.
 
-    show_progressbar: boolean, optional, default: False
+    show_progressbar: boolean, required
         Controls whether a progressbar is printed. Only enables progressbar
         on rank==0, the remaining ranks ignore this keyword.
 
