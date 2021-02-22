@@ -689,7 +689,7 @@ def update_container_h5_file(fname, h5files,
         outfiles = [h5files]
 
     try:
-        with h5py.File(fname, 'a') as hf:
+        with h5py.File(fname, 'r') as hf:
             nfiles = hf['/'].attrs['Nfiles']
             for ifile in range(nfiles):
                 outfiles.append(hf[f'File{ifile}'].file)
