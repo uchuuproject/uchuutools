@@ -470,6 +470,13 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
                       f"dataset = '{halos_dset_offset}'"
                 raise AssertionError(msg)
 
+        # All the trees for this call have now been read in entirely -> Now
+        # fix the actual dataset sizes to reflect the total number of
+        # halos written
+        resize_halo_datasets(halos_dset, halos_offset,
+                             write_halo_props_cont, output_dtype)
+        dset_size = halos_offset
+
         if nhalos_in_buffer > 0:
             write_halos(halos_dset, halos_dset_offset, halos_buffer,
                         nhalos_in_buffer, write_halo_props_cont)
@@ -486,12 +493,6 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         msg = f"Error: Expected to process {ntrees} trees but processed "\
               f"{ntrees_processed} trees instead"
         assert ntrees_processed == ntrees, msg
-
-        # All the trees for this call have now been read in entirely -> Now
-        # fix the actual dataset sizes to reflect the total number of
-        # halos written
-        resize_halo_datasets(halos_dset, halos_offset,
-                             write_halo_props_cont, output_dtype)
 
         # all halos from all forests have been written out and the halo
         # dataset has been correctly resized. Now write the aggregate
