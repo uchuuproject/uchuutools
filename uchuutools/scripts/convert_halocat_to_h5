@@ -26,13 +26,13 @@ prog_group.add_argument("-np", "--no-progressbar", dest='show_progressbar',
 # together, structure of arrays -> default)
 # write_halo_props_cont = True     # True -> structure of arrays,
 #                                  # False-> array of structures
-group = parser.add_mutually_exclusive_group()
-group.add_argument("-m", "--multiple-dsets", dest='write_halo_props_cont',
-                   action="store_true", default=True,
-                   help="write a separate dataset for each halo property")
-group.add_argument("-s", "--single-dset", dest='write_halo_props_cont',
-                   action="store_false", default=False,
-                   help="write a single dataset containing all halo "
+dset_group = parser.add_mutually_exclusive_group()
+dset_group.add_argument("-m", "--multiple-dsets", dest='write_halo_props_cont',
+                        action="store_true", default=True,
+                        help="write a separate dataset for each halo property")
+dset_group.add_argument("-s", "--single-dset", dest='write_halo_props_cont',
+                        action="store_false", default=False,
+                        help="write a single dataset containing all halo "
                         "properties")
 args = parser.parse_args()
 try:
