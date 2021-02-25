@@ -214,8 +214,8 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
 
     if (not buffersize) or (buffersize < output_dtype.itemsize):
         buffersize = 1024*1024  # 1 MB
-    nbuffer_halos = buffersize // output_dtype.itemsize
-    chunks = (nbuffer_halos, )
+    max_nhalos_buffer = buffersize // output_dtype.itemsize
+    chunks = (max_nhalos_buffer, )
 
     output_file = f"{outputdir}/{output_filebase}_{rank}.h5"
     if truncate:
@@ -283,7 +283,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
                                            compression=compression,
                                            maxshape=(None,))
 
-    halos_buffer = np.empty(nbuffer_halos, dtype=output_dtype)
+    halos_buffer = np.empty(max_nhalos_buffer, dtype=output_dtype)
     nhalos_in_buffer = 0
     with h5py.File(output_file, "a") as hf:
         # The filenames are written as byte-arrays (through np.string_)
@@ -437,7 +437,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
 
             # If there are not enough to trigger a write, simply fill up
             # the halos_buffer
-            if (nhalos_in_buffer + nhalos) < nbuffer_halos:
+            if (nhalos_in_buffer + nhalos) < max_nhalos_buffer:
                 assert halos_buffer.dtype == forest_halos.dtype
                 halos_buffer[nhalos_in_buffer:nhalos_in_buffer+nhalos] = forest_halos[:]
                 nhalos_in_buffer += nhalos
