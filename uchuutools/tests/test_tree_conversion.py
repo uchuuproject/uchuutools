@@ -6,9 +6,8 @@ __all__ = ["test_ctrees_conversion"]
 
 import numpy as np
 
-
-from utils import get_parser
-from ctrees_utils import get_treewalk_dtype_descr
+from uchuutools.utils import get_parser
+from uchuutools.ctrees_utils import get_treewalk_dtype_descr
 
 
 def _loadtree_from_offset(fp, offset, parser):
@@ -22,47 +21,83 @@ def _loadtree_from_offset(fp, offset, parser):
     return parser.pack(X)
 
 
-# def _test_tree_walk_indices(forest):
-#     print(f"forest.dtype.names = {forest.dtype.names}")
-#     for prog, desc in enumerate(forest['Descendant']):
-#         if desc == -1:
-#             continue
+def _load_forest_columns(halo_props, starthalo, nhalos, columns):
+    if not isinstance(columns, (list, tuple)):
+        columns = [columns]
 
-#         if forest['scale'][desc] <= forest['scale'][prog]:
-#             msg = f"Error: desc_scale = {forest['scale'][desc]} must be "\
-#                   f"greater than progenitor scale = {forest['scale'][prog]}"\
-#                   f"desc = {desc} prog = {prog} "\
-#                   f"desc_id = {forest['desc_id'][prog]}"\
-#                   f"id of desc = {forest['id'][desc]}, prog, "\
-#                   f"Tree_root_ID = {forest['Tree_root_ID'][prog]} "\
-#                   f"desc, Tree_root_ID = {forest['Tree_root_ID'][desc]}"
+    colnames = set(columns)
+    descr = [(name, halo_props[name].dtype) for name in colnames]
+    forest = np.empty(nhalos, dtype=np.dtype(descr))
+    for prop in columns:
+        forest[prop][:] = halo_props[prop][starthalo:starthalo+nhalos]
 
-#             raise AssertionError(msg)
-#         assert forest['id'][desc] == forest['desc_id'][prog]
+    return forest
 
-#         if forest['FirstProgenitor'][desc] == prog:
-#             # count the number of progenitors
-#             num_prog = 1
-#             nextprog = forest['NextProgenitor'][prog]
-#             while nextprog != -1:
-#                 num_prog += 1
-#                 nextprog = forest['NextProgenitor'][prog]
-#             assert forest['num_prog'][desc] == num_prog
-#         else:
-#             # This progenitor is not the primary progenitor
-#             # -> we need to check the nextprog values -> nextprog
-#             # *must* exist
-#             firstprog = forest['FirstProgenitor'][desc]
-#             nextprog = forest['NextProgenitor'][firstprog]
-#             msg = f"firstprog = {firstprog} desc = {desc} "\
-#                   f"prog = {prog} nextprog = {nextprog}"
-#             assert nextprog != -1, msg
-#             while nextprog != prog:
-#                 assert forest['desc_id'][nextprog] == forest['id'][desc]
-#                 ii = forest['NextProgenitor'][nextprog]
-#                 assert ii != -1
-#                 assert forest['Mvir'][nextprog] >= forest['Mvir'][ii]
-#                 nextprog = ii
+
+def _validate_forest_walk_indices(forest):
+    from numpy.testing import assert_array_equal
+
+    nhalos = forest.shape[0]
+    # Check the primary tree-walking indices
+    # (FirstHaloInFOFgroup, NextHaloInFOFgroup, PrevHaloInFOFgroup)
+    # (Descendant, FirstProgenitor, NextProgenitor, PrevProgenitor)
+    indices_fields = ['FirstHaloInFOFgroup', 'NextHaloInFOFgroup',
+                      'PrevHaloInFOFgroup', 'Descendant',
+                      'FirstProgenitor', 'NextProgenitor',
+                      'PrevProgenitor']
+    for fld in indices_fields:
+        # these are all indices and therefore must be either -1
+        # or have a value within [0, nhalos-1]
+        valid = np.where(forest[fld] != -1)[0]
+        if len(valid) > 0:
+            msg = f"The min. {fld} index = {forest[fld][valid].min()} "\
+                  "should be >= 0"
+            assert forest[fld][valid].min() >= 0, msg
+            msg = f"The max. {fld} index = {forest[fld][valid].max()} "\
+                  f"should be < nhalos = {nhalos}"
+            assert forest[fld][valid].max() < nhalos, msg
+
+    prop = 'FirstHaloInFOFgroup'
+    fof_idx = forest[prop][:]
+    msg = f"Error: The halos do not correctly point to the "\
+          f"host fof halo. ID of the halo pointed to by '{prop}' "\
+          f"should match the 'FofID'"
+    assert_array_equal(forest['id'][fof_idx], forest['FofID'][:])
+
+    prop = 'Descendant'
+    valid_desc = forest[prop][:] != -1
+    msg = f"Error: The halos do not correctly point to the "\
+          f"descendant halo. The ID of the halo pointed to by "\
+          f"'{prop}' should match the 'desc_id'"
+    desc = forest[prop][valid_desc]
+    assert_array_equal(forest['id'][desc],
+                       forest['desc_id'][valid_desc],
+                       err_msg=msg)
+    prop = 'scale'
+    msg = f"Error: The halos do not correctly point to the "\
+          f"descendant halo. The scale-factor of the halo pointed "\
+          f"to by '{prop}' should match the 'desc_scale'"
+    assert_array_equal(forest[prop][desc],
+                       forest['desc_scale'][valid_desc],
+                       err_msg=msg)
+    msg = "Error: The scale-factor of the descendant halo "\
+          "should be larger than the scale-factor of the "\
+          "progenitor halo. "
+    assert np.min(forest['scale'][desc] - forest['scale'][valid_desc]) > 0, msg
+
+    prop = 'FirstProgenitor'
+    valid_first_prog = forest[prop][:] != -1
+    msg = f"Error: The halos do not correctly point to the "\
+          f"descendant halo. The 'desc_id' of the halo pointed "\
+          f"to by '{prop}' should match the id of the halo "\
+          f"containing the '{prop}'"
+    first_prog = forest[prop][valid_first_prog]
+    assert_array_equal(forest['id'][valid_first_prog],
+                       forest['desc_id'][first_prog],
+                       err_msg=msg)
+
+    return True
+
 
 def _test_single_h5file(h5file, show_progressbar=True):
     import h5py
@@ -79,7 +114,7 @@ def _test_single_h5file(h5file, show_progressbar=True):
         if cont_halo_props:
             halo_props = dict()
             props = []
-            for name in hf['Forests'].keys():
+            for name in tqdm(hf['Forests'].keys()):
                 if not isinstance(hf[f"Forests/{name}"], h5py.Dataset):
                     continue
                 props.append(name)
@@ -96,61 +131,43 @@ def _test_single_h5file(h5file, show_progressbar=True):
         mergertree_names = set([name for name, _ in mergertree_descr])
 
         if show_progressbar:
-            ntrees = hf['TreeInfo'].shape[0]
-            pbar = tqdm(total=ntrees, unit='tree', disable=None)
+            nforests = hf['ForestInfo'].shape[0]
+            pbar = tqdm(total=nforests, unit='forest', disable=None)
 
-        for treeinfo in hf['TreeInfo']:
-            tfile = treeinfo['Input_Filename'].decode().replace('\x00', '')
-            offset = treeinfo['Input_TreeByteOffset']
-            fileptr = tree_file_handles[tfile]
-            tree = _loadtree_from_offset(fileptr, offset, parser)
+        treenum = 0
+        for forestinfo in hf['ForestInfo']:
+            ntrees_in_forest = forestinfo['ForestNtrees']
+            for treeinfo in hf['TreeInfo'][treenum:treenum + ntrees_in_forest]:
+                tfile = treeinfo['Input_Filename'].decode().replace('\x00', '')
+                offset = treeinfo['Input_TreeByteOffset']
+                fileptr = tree_file_handles[tfile]
+                tree = _loadtree_from_offset(fileptr, offset, parser)
 
-            h5_start = treeinfo['TreeHalosOffset']
-            h5_end = h5_start + treeinfo['TreeNhalos']
-            for prop in props:
-                if prop in mergertree_names:
-                    continue
+                h5_start = treeinfo['TreeHalosOffset']
+                h5_end = h5_start + treeinfo['TreeNhalos']
+                for prop in props:
+                    if prop in mergertree_names:
+                        continue
 
-                msg = f"Error: Halo property = '{prop}' is not the same "\
-                    "between the hdf5 and ascii files"
+                    msg = f"Error: Halo property = '{prop}' is not the same "\
+                        "between the hdf5 and ascii files"
 
-                assert_array_equal(tree[prop][:],
-                                   halo_props[prop][h5_start:h5_end],
-                                   err_msg=msg)
+                    assert_array_equal(tree[prop][:],
+                                       halo_props[prop][h5_start:h5_end],
+                                       err_msg=msg)
+            nhalos_in_forest = forestinfo['ForestNhalos']
+            start_halo = forestinfo['ForestHalosOffset']
+            forest_columns = ['id', 'scale', 'desc_scale', 'desc_id']
+            forest_columns.extend(mergertree_names)
 
-            # Check the primary tree-walking indices
-            # (FirstHaloInFOFgroup, NextHaloInFOFgroup, PrevHaloInFOFgroup)
-            # (Descendant, FirstProgenitor, NextProgenitor, PrevProgenitor)
-            prop = 'FirstHaloInFOFgroup'
-            fof_idx = tree[prop][:]
-            msg = f"Error: The halos do not correctly point to the "\
-                  f"host fof halo. ID of the halo pointed to by '{prop}' "\
-                  f"should match the 'FofID'"
-            assert_array_equal(tree['id'][fof_idx], tree['FofID'][:])
+            forest = _load_forest_columns(halo_props, start_halo,
+                                          nhalos_in_forest, forest_columns)
 
-            prop = 'Descendant'
-            valid_desc = tree[prop][:] != -1
-            msg = f"Error: The halos do not correctly point to the "\
-                  f"descendant halo. The ID of the halo pointed to by "\
-                  f"'{prop}' should match the 'desc_id'"
-            desc = tree['Descendant'][valid_desc]
-            assert_array_equal(tree['id'][desc],
-                               tree['desc_id'][valid_desc],
-                               err_msg=msg)
-
-            prop = 'FirstProgenitor'
-            valid_first_prog = tree[prop][:] != -1
-            msg = f"Error: The halos do not correctly point to the "\
-                  f"descendant halo. The 'desc_id' of the halo pointed "\
-                  f"to by '{prop}' should match the id of the halo "\
-                  f"containing the '{prop}'"
-            first_prog = tree[prop][valid_first_prog]
-            assert_array_equal(tree['id'][valid_first_prog],
-                               tree['desc_id'][first_prog],
-                               err_msg=msg)
-
+            _validate_forest_walk_indices(forest)
             if show_progressbar:
                 pbar.update(1)
+
+            treenum += ntrees_in_forest
 
     if show_progressbar:
         pbar.close()
@@ -226,13 +243,22 @@ def test_ctrees_conversion(h5files, show_progressbar=True, comm=None):
 
 
 if __name__ == "__main__":
-    base = ""
+    import argparse
+    descr = "Test the converted hdf5 forest-files against the input ascii "\
+            "Consistent-Trees files (optionally in MPI parallel)"
+    parser = argparse.ArgumentParser(description=descr)
+    parser.add_argument('h5files', metavar='<hdf5 file(s)>',
+                        type=str, nargs='+',
+                        help="the full path to the hdf5 files with the "
+                             "forest data")
+
+    parser.parse_args()
+    args = parser.parse_args()
+
     try:
         from mpi4py import MPI
         comm = MPI.COMM_WORLD
     except ImportError:
         comm = None
 
-    base = "/home/msinha/scratch/simulations/uchuu/U2000/trees/hdf5/with-tree-indices"
-    h5files = [f"{base}/forest_{rank}.h5" for rank in range(5)]
-    test_ctrees_conversion(h5files, comm)
+    test_ctrees_conversion(args.h5files, comm)

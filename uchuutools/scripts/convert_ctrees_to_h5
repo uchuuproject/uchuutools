@@ -26,9 +26,14 @@ parser.add_argument('outputdir', metavar='<output directory>', type=str,
 parser.add_argument("filenames", metavar="<CTrees filenames>",
                     type=str, nargs='+',
                     help="list of input (ascii) Consistent-Trees filenames")
-parser.add_argument("-p", "--progressbar", dest='show_progressbar',
-                    action="store_true", default=True,
-                    help="display a progressbar on rank=0")
+
+prog_group = parser.add_mutually_exclusive_group()
+prog_group.add_argument("-p", "--progressbar", dest='show_progressbar',
+                        action="store_true", default=True,
+                        help="display a progressbar on rank=0")
+prog_group.add_argument("-np", "--no-progressbar", dest='show_progressbar',
+                        action='store_false', help="disable the progressbar")
+
 # Do you want to write each halo as a struct (i.e., ALL the
 # properties of any given halo are written together, array of structures),
 # or do you want to write out individual datasets for each of the
@@ -36,13 +41,13 @@ parser.add_argument("-p", "--progressbar", dest='show_progressbar',
 # together, structure of arrays -> default)
 # write_halo_props_cont = True     # True -> structure of arrays,
 #                                  # False-> array of structures
-group = parser.add_mutually_exclusive_group()
-group.add_argument("-m", "--multiple-dsets", dest='write_halo_props_cont',
-                   action="store_true", default=True,
-                   help="write a separate dataset for each halo property")
-group.add_argument("-s", "--single-dset", dest='write_halo_props_cont',
-                   action="store_false", default=False,
-                   help="write a single dataset containing all halo "
+dset_group = parser.add_mutually_exclusive_group()
+dset_group.add_argument("-m", "--multiple-dsets", dest='write_halo_props_cont',
+                        action="store_true", default=True,
+                        help="write a separate dataset for each halo property")
+dset_group.add_argument("-s", "--single-dset", dest='write_halo_props_cont',
+                        action="store_false", default=False,
+                        help="write a single dataset containing all halo "
                         "properties")
 try:
     args = parser.parse_args()
