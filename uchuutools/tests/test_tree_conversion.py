@@ -177,6 +177,7 @@ def _test_single_h5file(h5file, asciidir=None, show_progressbar=True):
             for treeinfo in hf['TreeInfo'][treenum:treenum + ntrees_in_forest]:
                 tfile = treeinfo['Input_Filename'].decode().replace('\x00', '')
                 offset = treeinfo['Input_TreeByteOffset']
+
                 try:
                     fileptr = tree_file_handles[tfile]
                 except KeyError:
