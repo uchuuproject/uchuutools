@@ -5,6 +5,7 @@ __author__ = "Manodeep Sinha"
 __all__ = ["test_ctrees_conversion"]
 
 import numpy as np
+import os
 
 from uchuutools.utils import get_parser
 from uchuutools.ctrees_utils import get_treewalk_dtype_descr
@@ -99,7 +100,7 @@ def _validate_forest_walk_indices(forest):
     return True
 
 
-def _test_single_h5file(h5file, show_progressbar=True):
+def _test_single_h5file(h5file, asciidir=None, show_progressbar=True):
     import h5py
     from numpy.testing import assert_array_equal
     from tqdm import tqdm
@@ -115,16 +116,52 @@ def _test_single_h5file(h5file, show_progressbar=True):
             halo_props = dict()
             props = []
             for name in tqdm(hf['Forests'].keys()):
-                if not isinstance(hf[f"Forests/{name}"], h5py.Dataset):
+                fld = f"Forests/{name}"
+                if not isinstance(hf[fld], h5py.Dataset):
                     continue
                 props.append(name)
-                arr = np.asarray(hf[f"Forests/{name}"])
+                arr = np.asarray(hf[fld])
                 halo_props[name] = arr
         else:
             props = dtype.names
             halo_props = np.asarray(hf["Forests/halos"])
 
         treefiles = [tf.decode() for tf in hf.attrs[u'input_files']]
+
+        ## MS (08/03/2021): The concise (and less resilient) version
+        # of replacing the input tree filenames with the alternate directory
+        # treefiles = [tf if (os.path.isfile(tf)) else
+        #                 f"{asciidir}/{os.path.basename(tf)}"
+        #                 for tf in treefiles]
+
+        ## MS: The verbose version of replacing the input ascii tree filenames
+        for tf in treefiles:
+            if os.path.isfile(tf):
+                continue
+            else:
+                if not asciidir or (not os.path.isdir(asciidir)):
+                    msg = "Error: Could not locate the original ascii "
+                    msg += f"Consistent-Trees file (filename = {tf}).\n"
+                    msg += "If the files have been moved to another directory,"
+                    msg += "please pass that directory name via the"
+                    msg += "`asciidir` parameter"
+                    raise FileNotFoundError(msg)
+
+                basename = os.path.basename(tf)
+                newname = f"{asciidir}/{basename}"
+                if os.path.isfile(newname):
+                    # replace the filename in the list of (unique) filenames
+                    print(f"LOG: Replacing old filename '{tf}' with the "
+                          f"new filename '{newname}'")
+                    treefiles.remove(tf)
+                    treefiles.append(newname)
+                else:
+                    msg = f"Error: Could not locate filename = {newname} as"
+                    msg += "the alternate file based on the alternate \nascii "
+                    msg += f"directory = {asciidir}.\nThe original "
+                    msg += f"filename specified in the hdf5 file is {tf}\n"
+                    raise FileNotFoundError(msg)
+
         tree_file_handles = dict((tf, open(tf, 'rt')) for tf in treefiles)
         parser = get_parser(treefiles[0])
         mergertree_descr = get_treewalk_dtype_descr()
@@ -140,7 +177,13 @@ def _test_single_h5file(h5file, show_progressbar=True):
             for treeinfo in hf['TreeInfo'][treenum:treenum + ntrees_in_forest]:
                 tfile = treeinfo['Input_Filename'].decode().replace('\x00', '')
                 offset = treeinfo['Input_TreeByteOffset']
-                fileptr = tree_file_handles[tfile]
+                try:
+                    fileptr = tree_file_handles[tfile]
+                except KeyError:
+                    basename = os.path.basename(tfile)
+                    newname = f"{asciidir}/{basename}"
+                    fileptr = tree_file_handles[newname]
+
                 tree = _loadtree_from_offset(fileptr, offset, parser)
 
                 h5_start = treeinfo['TreeHalosOffset']
@@ -175,7 +218,7 @@ def _test_single_h5file(h5file, show_progressbar=True):
     return True
 
 
-def test_ctrees_conversion(h5files, show_progressbar=True, comm=None):
+def test_ctrees_conversion(h5files, asciidir=None, show_progressbar=True, comm=None):
     """
     Tests whether the list of hdf5 filenames correctly converted the input
     Consistent-Trees data
@@ -187,7 +230,12 @@ def test_ctrees_conversion(h5files, show_progressbar=True, comm=None):
         The names of the converted files (e.g., [`forest_0.h5`, `forest_1.h5`])
         to be tested
 
-    show_progressbar: boolean, optional
+    asciidir: directory name, string, optional, default:None
+        The name of an alternate directory containing the original ascii files.
+        This will be only be used where the ascii filenames in hdf5-file metadata
+        can not be accessed
+
+    show_progressbar: boolean, optional, default: True
         Controls whether the progressbar is shown during testing
 
     comm: MPI communicator, optional, default: None
@@ -231,7 +279,7 @@ def test_ctrees_conversion(h5files, show_progressbar=True, comm=None):
         h5file = h5files[ii]
         t0 = time.perf_counter()
         print(f"[Rank={rank}]: Testing trees in the {h5file} file ...")
-        _test_single_h5file(h5file, show_progressbar=show_progressbar)
+        _test_single_h5file(h5file, asciidir=asciidir, show_progressbar=show_progressbar)
         t1 = time.perf_counter()
         print(f"[Rank={rank}:] Testing trees in the {h5file} file ...done. "
               f"Time taken = {t1-t0:0.2f} seconds")
@@ -252,6 +300,18 @@ if __name__ == "__main__":
                         help="the full path to the hdf5 files with the "
                              "forest data")
 
+    parser.add_argument("-a", '--asciidir', metavar='<alternate CTrees directory>',
+                        type=str, nargs='?', default=None,
+                        help="alternate directory containing the "\
+                             "ascii Consistent-Trees files")
+
+    prog_group = parser.add_mutually_exclusive_group()
+    prog_group.add_argument("-p", "--progressbar", dest='show_progressbar',
+                            action="store_true", default=True,
+                            help="display a progressbar on rank=0")
+    prog_group.add_argument("-np", "--no-progressbar", dest='show_progressbar',
+                            action='store_false', help="disable the progressbar")
+
     parser.parse_args()
     args = parser.parse_args()
 
@@ -261,4 +321,7 @@ if __name__ == "__main__":
     except ImportError:
         comm = None
 
-    test_ctrees_conversion(args.h5files, comm)
+    test_ctrees_conversion(args.h5files,
+                           asciidir=args.asciidir,
+                           show_progressbar=args.show_progressbar,
+                           comm=comm)
