@@ -8,11 +8,11 @@ Installation
 
     $ git clone https://github.com/uchuuproject/uchuutools
     $ cd uchuutools
-    $ pip install .
+    $ python -m pip install .
 
 or by installing it directly from `PyPI`_ with::
 
-    $ pip install uchuutools
+    $ python -m pip install uchuutools
 
 *uchuutools* can now be imported as a package with :pycode:`import uchuutools`.
 
