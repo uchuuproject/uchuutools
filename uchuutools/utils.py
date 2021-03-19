@@ -10,6 +10,7 @@ __author__ = "Manodeep Sinha"
 __all__ = ["get_parser", "get_approx_totnumhalos", "generic_reader",
            "get_metadata", "resize_halo_datasets",
            "check_and_decompress", "distribute_array_over_ntasks",
+           "check_for_contiguous_halos",
            "write_halos", "update_container_h5_file", ]
 
 
@@ -562,6 +563,56 @@ def distribute_array_over_ntasks(cost_array, rank, ntasks):
             raise ValueError(msg)
 
     return (start, stop)
+
+
+def check_for_contiguous_halos(h5_task_file, write_halo_props_cont):
+    """
+    Checks that the hdf5 file can be appended to with the requested writing
+    of halo properties
+
+    Parameters
+    -----------
+
+    h5_task_file: string, required
+        An existing hdf5 file. The file may or may not contain halos, but
+        the dataset (or datasets, depending on the value of
+        ``write_halo_props_cont``) for the halo properties should already
+        be created
+
+    write_halo_props_cont: boolean, required
+        Controls if the individual halo properties are written as distinct
+        datasets such that any given property for ALL halos is written
+        contiguously (structure of arrays, SOA).
+
+    Returns
+    -------
+
+        Returns ``True`` on successful completion
+    """
+    import os
+    import h5py
+
+    if not os.path.isfile(h5_task_file):
+        msg = "Error: You have specified to append to the hdf5 file but "\
+              f"the file ={h5_task_file} does *not* exist. You can fix this "\
+              "error by passing ``truncate=True`` (but that may truncate "\
+              "other hdf5 files that you have previously created)."
+        raise ValueError(msg)
+
+    with h5py.File(h5_task_file, 'r') as hf:
+        if hf.attrs['contiguous-halo-props'] != write_halo_props_cont:
+            msg = "Error: Found incompatible option for writing contiguous "\
+                  f"halo properties when appending to the hdf5 file = {h5_task_file}. "\
+                  "The hdf5 file was created with "\
+                  f"``write_halo_props_cont={hf.attrs['contiguous-halo-props']}`` "\
+                  f"but the current request is with ``write_halo_props_cont={write_halo_props_cont}``.\n"\
+                  f"You can fix this either by setting "\
+                  f"``write_halo_props_cont={hf.attrs['contiguous-halo-props']}``"\
+                  f"or by setting ``truncate=True`` (but that will "\
+                   "over-write the existing file)."
+            raise ValueError(msg)
+
+    return True
 
 
 def resize_halo_datasets(halos_dset, new_size, write_halo_props_cont, dtype):

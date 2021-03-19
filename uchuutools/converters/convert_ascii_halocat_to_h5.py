@@ -44,6 +44,8 @@ def _convert_single_halocat(input_file, rank,
         properties of a halo is written out contiguously (array of
         structures).
 
+        In both cases, the halos are written under the root group ``HaloCatalogue``.
+
     fields: list of strings, required
         Describes which specific columns in the input file to carry across
         to the hdf5 file. Default action is to convert ALL columns.
