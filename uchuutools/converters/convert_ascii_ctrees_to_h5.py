@@ -221,7 +221,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     output_file = f"{outputdir}/{output_filebase}_{rank}.h5"
     if truncate:
         with h5py.File(output_file, "w") as hf:
-            # give the HDF5 root some more attributes
+            # give the HDF5 root some attributes
             hf.attrs['input_files'] = np.string_(alltreedatafiles)
             mtimes = [os.path.getmtime(f) for f in alltreedatafiles]
             hf.attrs['input_filedatestamp'] = np.array(mtimes)
