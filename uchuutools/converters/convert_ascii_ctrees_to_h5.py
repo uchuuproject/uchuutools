@@ -10,7 +10,8 @@ import io
 
 from ..utils import get_metadata, get_parser, \
                     distribute_array_over_ntasks, get_approx_totnumhalos, \
-                    check_and_decompress, resize_halo_datasets, write_halos, \
+                    check_and_decompress, check_for_contiguous_halos, \
+                    resize_halo_datasets, write_halos, \
                     update_container_h5_file
 
 from ..ctrees_utils import read_locations_and_forests, \
@@ -220,7 +221,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     output_file = f"{outputdir}/{output_filebase}_{rank}.h5"
     if truncate:
         with h5py.File(output_file, "w") as hf:
-            # give the HDF5 root some more attributes
+            # give the HDF5 root some attributes
             hf.attrs['input_files'] = np.string_(alltreedatafiles)
             mtimes = [os.path.getmtime(f) for f in alltreedatafiles]
             hf.attrs['input_filedatestamp'] = np.array(mtimes)
@@ -282,6 +283,16 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
                                            chunks=chunks,
                                            compression=compression,
                                            maxshape=(None,))
+
+    # If ``truncate=True`` was specified, then the file has already
+    # been created but contains 0 halos. At this point in the code,
+    # we are appending to an existing hdf5 file. Therefore, two
+    # conditions must be satisfed:
+    #   i) file must exist
+    #   ii) the file must have been created with the same value
+    #       of ``write_halo_props_cont``
+    # This utility checks for these two conditions - MS 19/3/2021
+    check_for_contiguous_halos(output_file, write_halo_props_cont)
 
     halos_buffer = np.empty(max_nhalos_buffer, dtype=output_dtype)
     nhalos_in_buffer = 0

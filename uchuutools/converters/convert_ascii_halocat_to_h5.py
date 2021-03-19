@@ -44,6 +44,8 @@ def _convert_single_halocat(input_file, rank,
         properties of a halo is written out contiguously (array of
         structures).
 
+        In both cases, the halos are written under the root group ``HaloCatalogue``.
+
     fields: list of strings, required
         Describes which specific columns in the input file to carry across
         to the hdf5 file. Default action is to convert ALL columns.
@@ -131,7 +133,7 @@ def _convert_single_halocat(input_file, rank,
         scale_factor = float((line_with_scale_factor.split('='))[1])
         redshift = 1.0/scale_factor - 1.0
 
-        # give the HDF5 root some more attributes
+        # give the HDF5 root some attributes
         hf.attrs[u"input_filename"] = np.string_(input_file)
         hf.attrs[u"input_filedatestamp"] = np.array(os.path.getmtime(input_file))
         hf.attrs[u"input_catalog_type"] = np.string_(input_catalog_type)

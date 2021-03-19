@@ -25,6 +25,7 @@ The documentation of *uchuutools* is spread out over several sections:
     :caption: User Documentation
 
     user/getting_started
+    user/data_formats
     community_guidelines
 
 .. _api-docs:
