@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
 __author__ = "Manodeep Sinha"
 __all__ = ["convert_ctrees_to_h5"]
 
@@ -8,6 +6,7 @@ import os
 import time
 import io
 
+from ..__version__ import __version__
 from ..utils import get_metadata, get_parser, \
                     distribute_array_over_ntasks, get_approx_totnumhalos, \
                     check_and_decompress, check_for_contiguous_halos, \
@@ -149,7 +148,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         Returns ``True`` on successful completion.
 
     """
-
+    from os import path
     import numpy as np
     import h5py
     import sys
@@ -169,20 +168,20 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     # Set the datalen for strings
     string_dtype = 'S1024'
 
-    if not os.path.isdir(outputdir):
-        msg = f"Error: The first parameter (output directory) = "\
-              f"'{outputdir}' should be of type directory"
+    if not path.isdir(outputdir):
+        msg = f"[Rank {rank}]: Error: The first parameter (output directory) "\
+              f"= '{outputdir}' should be of type directory"
         raise ValueError(msg)
 
     ntrees = trees_and_locations.shape[0]
     nforests = forest_info.shape[0]
     if nforests > ntrees:
-        msg = f"Error: Expected the number of trees = '{ntrees}' "\
+        msg = f"[Rank {rank}]: Error: Expected the number of trees = '{ntrees}' "\
                "to be *at most* equal to the number of "\
               f"forests = '{nforests}'"
         raise AssertionError(msg)
     if ntrees <= 0:
-        msg = f"[Rank={rank}] Error: ntrees = {ntrees} should be >= 0"
+        msg = f"[Rank={rank}]: Error: ntrees = {ntrees} should be >= 0"
         raise AssertionError(msg)
     totnbytes = forest_info['Input_ForestNbytes'].sum()
     print(f"[Rank={rank}]: processing {totnbytes} bytes "
@@ -222,8 +221,9 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
     if truncate:
         with h5py.File(output_file, "w") as hf:
             # give the HDF5 root some attributes
+            hf.attrs[u"version"] = __version__
             hf.attrs['input_files'] = np.string_(alltreedatafiles)
-            mtimes = [os.path.getmtime(f) for f in alltreedatafiles]
+            mtimes = [path.getmtime(f) for f in alltreedatafiles]
             hf.attrs['input_filedatestamp'] = np.array(mtimes)
             hf.attrs["input_catalog_type"] = np.string_(input_catalog_type)
             hf.attrs[f"{input_catalog_type}_version"] = np.string_(version_info)
@@ -331,14 +331,14 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         # We need to update how many *unique* input files have gone into
         # this hdf5 file
         hf.attrs['input_files'] = np.string_(target_all_files)
-        hf.attrs['input_filedatestamp'] = np.array([os.path.getmtime(f)
+        hf.attrs['input_filedatestamp'] = np.array([path.getmtime(f)
                                                     for f in target_all_files])
 
         tree_dset = hf['TreeInfo']
         forest_dset = hf['ForestInfo']
 
         if forest_dset.shape[0] != hf.attrs['Nforests']:
-            msg = "Error: The forest dataset does not contain *exactly* "\
+            msg = f"[Rank {rank}]: Error: The forest dataset does not contain *exactly* "\
                   "the same number of forests as specified in the file "\
                   f"attribute. Shape of forest dataset = "\
                   f"'{forest_dset.shape}', nforests in file attribute"\
@@ -347,7 +347,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         forest_offset = hf.attrs['Nforests']
 
         if tree_dset.shape[0] != hf.attrs['Ntrees']:
-            msg = "Error: The tree dataset does not contain *exactly* "\
+            msg = f"[Rank {rank}]: Error: The tree dataset does not contain *exactly* "\
                   "the same number of trees as specified in the file "\
                   f"attribute. shape of tree dataset = '{tree_dset.shape}' "\
                   f"ntrees in file attribute = '{hf.attrs['Ntrees']}'"
@@ -380,7 +380,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
 
         # These quantities relate to the input files
         tree_dset[-ntrees:, 'Input_Filename'] = np.string_(trees_and_locations['Filename'][:])
-        mtimes = [os.path.getmtime(fn) for fn in trees_and_locations['Filename']]
+        mtimes = [path.getmtime(fn) for fn in trees_and_locations['Filename']]
         tree_dset[-ntrees:, 'Input_FileDateStamp'] = np.array(mtimes)
         tree_dset[-ntrees:, 'Input_TreeByteOffset'] = trees_and_locations['Offset'][:]
         tree_dset[-ntrees:, 'Input_TreeNbytes'] = trees_and_locations['TreeNbytes'][:]
@@ -475,10 +475,10 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
                         nhalos, write_halo_props_cont)
             halos_dset_offset += nhalos
             if halos_offset != halos_dset_offset:
-                msg = f"Error: After writing out halos into the hdf5 file, "\
-                      f"expected to find that halos_offset = '{halos_offset}'"\
-                      f" to be *exactly* equal to the offset in the hdf5 "\
-                      f"dataset = '{halos_dset_offset}'"
+                msg = f"[Rank {rank}]: Error: After writing out halos into the "\
+                      f"hdf5 file, expected to find that halos_offset "\
+                      f"= '{halos_offset}' to be *exactly* equal to the "\
+                      f"offset in the hdf5 dataset = '{halos_dset_offset}'"
                 raise AssertionError(msg)
 
         # All the trees for this call have now been read in entirely -> Now
@@ -495,13 +495,13 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
             nhalos_in_buffer = 0
 
         if halos_offset != halos_dset_offset:
-            msg = f"Error: After writing *all* the halos into the hdf5 file, "\
+            msg = f"[Rank {rank}]: Error: After writing *all* the halos into the hdf5 file, "\
                   f"expected to find that halos_offset = '{halos_offset}'"\
                   f" to be *exactly* equal to the offset in the hdf5 "\
                   f"dataset = '{halos_dset_offset}'"
             raise AssertionError(msg)
 
-        msg = f"Error: Expected to process {ntrees} trees but processed "\
+        msg = f"[Rank {rank}]: Error: Expected to process {ntrees} trees but processed "\
               f"{ntrees_processed} trees instead"
         assert ntrees_processed == ntrees, msg
 
@@ -517,6 +517,7 @@ def _convert_ctrees_forest_range(forest_info, trees_and_locations, rank,
         hf.attrs['Ntrees'] += ntrees
         hf.attrs['Nhalos'] = halos_offset
         if show_progressbar:
+            pbar.total = halos_offset
             pbar.close()
 
         # Close all the open file handlers
@@ -641,8 +642,8 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
         Returns ``True`` on successful completion.
 
     """
-    import os
     import sys
+    from os import path
     import time
     import numpy as np
 
@@ -652,7 +653,7 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
         rank = comm.Get_rank()
         ntasks = comm.Get_size()
 
-    if not os.path.isdir(outputdir):
+    if not path.isdir(outputdir):
         msg = f"Error: Output directory = {outputdir} is not a valid directory"
         raise ValueError(msg)
 
@@ -704,7 +705,7 @@ def convert_ctrees_to_h5(filenames, standard_consistent_trees=None,
                      f"Instead found filenames = '{filenames}'"
                 raise ValueError(msg)
 
-            filebasenames = set([os.path.basename(f) for f in filenames])
+            filebasenames = set([path.basename(f) for f in filenames])
             expected_filebasenames = set(['forests.list', 'locations.dat'])
             if filebasenames != expected_filebasenames:
                 msg = "Error: To convert a standard Consistent-Trees output, "\

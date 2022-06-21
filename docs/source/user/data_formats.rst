@@ -22,7 +22,7 @@ Consistent-Trees HDF5 format for Tree catalogues
 The Consistent-Trees tree hdf5 format consists of two types of files:
 
 #. one container hdf5 file,
-#. one or more hdf5 files that contain the forest/tree/halo level information (we will refer to this as ``hdf5-treecat`` file)
+#. one or more hdf5 files that contain the forest/tree/halo level information (we will refer to this as ``hdf5-treedata`` file)
 
 Container HDF5 file format
 ===========================
@@ -54,90 +54,93 @@ hdf5 file under ``File<ifile>``, where ``ifile`` ranges from ``[0, Nfiles)``. Us
 
 .. code-block:: python
 
-    def update_container_h5_file(fname, h5files,
-                                standard_consistent_trees=True):
-        """
-        Writes the container hdf5 file that has external links to
-        the hdf5 datafiles with the mergertree information.
+        def update_container_h5_file(fname, h5files,
+                                    standard_consistent_trees=True):
+            """
+            Writes the container hdf5 file that has external links to
+            the hdf5 datafiles with the mergertree information.
 
-        Parameters
-        -----------
+            Parameters
+            -----------
 
-        fname: string, required
-            The name of the output container file (usually ``forest.h5``). A
-            new file is always created, however, if the file ``fname`` previously
-            existed then the external links are preserved.
+            fname: string, required
+                The name of the output container file (usually ``forest.h5``). A
+                new file is always created, however, if the file ``fname`` previously
+                existed then the external links are preserved.
 
-        h5files: list of filenames, required
-            The list of filenames that were either newly created or updated.
+            h5files: list of filenames, required
+                The list of filenames that were either newly created or updated.
 
-            If the container file ``fname`` exists, then the union of the filenames
-            that already existed in ``fname`` and ``h5files`` will be used to
-            create the external links
+                If the container file ``fname`` exists, then the union of the filenames
+                that already existed in ``fname`` and ``h5files`` will be used to
+                create the external links
 
-        standard_consistent_tree: boolean, optional, default: True
-            Specifies whether the input files were from a parallel
-            Consistent-Trees code or the standard Consistent-Trees code. Assumed
-            to be standard (i.e., the public version) of the Consistent-Trees
-            catalog
+            standard_consistent_tree: boolean, optional, default: True
+                Specifies whether the input files were from a parallel
+                Consistent-Trees code or the standard Consistent-Trees code. Assumed
+                to be standard (i.e., the public version) of the Consistent-Trees
+                catalog
 
-        Returns
-        -------
+            Returns
+            -------
 
-        Returns ``True`` on successful completion of the write
+            Returns ``True`` on successful completion of the write
 
-        """
-        import h5py
+            """
+            import os
+            import h5py
 
-        outfiles = h5files
-        if not isinstance(h5files, (list, tuple)):
-            outfiles = [h5files]
+            outfiles = h5files
+            if not isinstance(h5files, (list, tuple)):
+                outfiles = (h5files, )
 
-        try:
-            with h5py.File(fname, 'r') as hf:
-                nfiles = hf['/'].attrs['Nfiles']
-                for ifile in range(nfiles):
-                    outfiles.append(hf[f'File{ifile}'].file)
-        except OSError:
-            pass
+            try:
+                with h5py.File(fname, 'r') as hf:
+                    nfiles = hf['/'].attrs['Nfiles']
+                    for ifile in range(nfiles):
+                        outfiles.append(hf[f'File{ifile}'].file)
+            except OSError:
+                pass
 
-        outfiles = set(outfiles)
-        nfiles = len(outfiles)
-        with h5py.File(fname, 'w') as hf:
-            hf['/'].attrs['Nfiles'] = nfiles
-            hf['/'].attrs['TotNforests'] = 0
-            hf['/'].attrs['TotNtrees'] = 0
-            hf['/'].attrs['TotNhalos'] = 0
-            attr_props = [('TotNforests', 'Nforests'),
-                        ('TotNtrees', 'Ntrees'),
-                        ('TotNhalos', 'Nhalos')]
-            for ifile, outfile in enumerate(outfiles):
-                with h5py.File(outfile, 'a') as hf_task:
-                    if standard_consistent_trees:
-                        hf_task.attrs['consistent-trees-type'] = 'standard'
-                    else:
-                        hf_task.attrs['consistent-trees-type'] = 'parallel'
-                    for (out, inp) in attr_props:
-                        hf['/'].attrs[out] += hf_task['/'].attrs[inp]
+            outfiles = set(outfiles)
+            nfiles = len(outfiles)
+            with h5py.File(fname, 'w') as hf:
+                hf['/'].attrs['Nfiles'] = nfiles
+                hf['/'].attrs['TotNforests'] = 0
+                hf['/'].attrs['TotNtrees'] = 0
+                hf['/'].attrs['TotNhalos'] = 0
+                attr_props = [('TotNforests', 'Nforests'),
+                            ('TotNtrees', 'Ntrees'),
+                            ('TotNhalos', 'Nhalos')]
+                for ifile, outfile in enumerate(outfiles):
+                    with h5py.File(outfile, 'a') as hf_task:
+                        if standard_consistent_trees:
+                            hf_task.attrs['consistent-trees-type'] = 'standard'
+                        else:
+                            hf_task.attrs['consistent-trees-type'] = 'parallel'
+                        hf_task.attrs['container-filename'] = np.string_(fname)
+                        for (out, inp) in attr_props:
+                            hf['/'].attrs[out] += hf_task['/'].attrs[inp]
+                    relpath = os.path.relpath(outfile, start=os.path.dirname(fname))
+                    hf[f'File{ifile}'] = h5py.ExternalLink(relpath, '/')
+            return
 
-                hf[f'File{ifile}'] = h5py.ExternalLink(outfile, '/')
-        return
 
 .. raw:: html
 
    </details>
 
-HDF5-treecat file format
+hdf5-treedata file format
 ==========================
 
-There may be one or more hdf5 data-files written as part of the conversion process. These files contain the actual halo information, as well as tree-level and forest-level information contained in the original ascii Consistent-Trees tree catalogues. In this section, we will describe this ``hdf5-treecat`` file format.
+There may be one or more hdf5 data-files written as part of the conversion process. These files contain the actual halo information, as well as tree-level and forest-level information contained in the original ascii Consistent-Trees tree catalogues. In this section, we will describe this ``hdf5-treedata`` file format.
 
 .. note:: The total number of hdf5 data-files associated with the container file is simply the number of parallel tasks used during the ascii->hdf5 conversion. For serial conversions, there will be *exactly* one hdf5 data-file (by defaut, named ``./forest_0.h5``)
 
 
 File-level Attributes (``list(hf.attrs)``)
 -------------------------------------------
-The ``hdf5-treecat`` file has attributes at the root-level to store metadata about the input ascii Consistent-trees catalogues. The following attributes of the container hdf5 file facilitate reading the hdf5 file:
+The ``hdf5-treedata`` file has attributes at the root-level to store metadata about the input ascii Consistent-trees catalogues. The following attributes of the container hdf5 file facilitate reading the hdf5 file:
 
 #. **Nforests**: Total number of forests stored in this file(``np.int64``)
 #. **Ntrees**: Total number of trees stored in this file (``np.int64``)

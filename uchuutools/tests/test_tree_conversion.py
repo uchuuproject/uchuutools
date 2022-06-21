@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
 __author__ = "Manodeep Sinha"
 __all__ = ["test_ctrees_conversion"]
 
@@ -24,7 +22,7 @@ def _loadtree_from_offset(fp, offset, parser):
 
 def _load_forest_columns(halo_props, starthalo, nhalos, columns):
     if not isinstance(columns, (list, tuple)):
-        columns = [columns]
+        columns = (columns, )
 
     colnames = set(columns)
     descr = [(name, halo_props[name].dtype) for name in colnames]
@@ -219,7 +217,8 @@ def _test_single_h5file(h5file, asciidir=None, show_progressbar=True):
     return True
 
 
-def test_ctrees_conversion(h5files, asciidir=None, show_progressbar=True, comm=None):
+def test_ctrees_conversion(h5files, asciidir=None,
+                           show_progressbar=True, comm=None):
     """
     Tests whether the list of hdf5 filenames correctly converted the input
     Consistent-Trees data
@@ -269,7 +268,7 @@ def test_ctrees_conversion(h5files, asciidir=None, show_progressbar=True, comm=N
 
     # Protect against the case where a single file was passsed
     if not isinstance(h5files, (list, tuple)):
-        h5files = [h5files]
+        h5files = (h5files, )
 
     if rank != 0:
         show_progressbar = False

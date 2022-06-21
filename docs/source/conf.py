@@ -50,8 +50,13 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
-    'sphinx.ext.intersphinx'
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.autosectionlabel'
 ]
+
+# autosection label configuration
+# Make sure the target is unique
+autosectionlabel_prefix_document = True
 
 # Intersphinx configuration
 intersphinx_mapping = {'python': ('https://docs.python.org/3', None),

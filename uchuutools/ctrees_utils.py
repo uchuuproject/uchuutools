@@ -107,6 +107,14 @@ def read_locations_and_forests(forests_fname, locations_fname, rank=0):
         return np.dtype(fields_and_type)
 
     # The main `read_locations_and_forests` function begins here
+
+    # Add current working directory to the forests and locations
+    # filenames
+    add_cwd_if_needed = lambda fname: fname if '/' in fname else \
+                                      os.path.join(os.getcwd(), fname)
+    forests_fname = add_cwd_if_needed(forests_fname)
+    locations_fname = add_cwd_if_needed(locations_fname)
+
     forests_dtype = _get_dtype_from_header(forests_fname)
     locations_dtype = _get_dtype_from_header(locations_fname)
 
@@ -140,8 +148,8 @@ def read_locations_and_forests(forests_fname, locations_fname, rank=0):
     # Check that the base directory is the same
     # for the 'forests.list' and 'locations.dat' files
     # Otherwise, since the code the code logic will fail in the conversion
-    dirname = list(set([os.path.dirname(f) for f in [forests_fname,
-                                                     locations_fname]]))
+    dirname = list(set([os.path.dirname(os.path.realpath(f)) for f in
+                       [forests_fname, locations_fname]]))
     if len(dirname) != 1:
         msg = "Error: Standard Consistent-Trees catalogs *should* "\
               "create the 'forests.list' and 'locations.dat' in the "\
@@ -150,8 +158,8 @@ def read_locations_and_forests(forests_fname, locations_fname, rank=0):
         raise ValueError(msg)
 
     dirname = dirname[0]
-    # The 'locations.dat' file does not have fully-qualified paths
-    # Add the prefix so all future queries woork out just fine
+    # The 'locations.dat' file do not have fully-qualified paths
+    # Add the prefix so all future queries work out just fine
     filenames = [f'{dirname}/{fname}' for fname in locations['Filename']
                  if '/' not in fname]
     locations['Filename'][:] = filenames

@@ -20,12 +20,27 @@ helpmsg += "If you are converting the output of the parallel "\
             "automatically constructed.\n\n"
 descr = "Convert ascii Consistent-Trees files into hdf5 "\
         "(optionally in MPI parallel)"
+
+rank = 0
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
+except ImportError:
+    comm = None
+
 parser = argparse.ArgumentParser(description=descr)
 parser.add_argument('outputdir', metavar='<output directory>', type=str,
                     help='the output directory for the hdf5 file(s)')
+parser.add_argument('output_filebase',
+                    metavar='<output file prefix>',
+                    type=str, default='forest',
+                    help='the prefix to use for the output hdf file(s). '
+                         'The fully qualified output filename is '
+                         f'<outputdir>/<output_fileprefix>_{rank}.h5')
 parser.add_argument("filenames", metavar="<CTrees filenames>",
                     type=str, nargs='+',
-                    help="list of input (ascii) Consistent-Trees filenames")
+                    help="list of input (ascii) Consistent-Trees filenames (must provide at least one file to convert)")
 
 prog_group = parser.add_mutually_exclusive_group()
 prog_group.add_argument("-p", "--progressbar", dest='show_progressbar',
@@ -55,12 +70,7 @@ except SystemExit as e:
     print(helpmsg)
     raise e
 
-try:
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-except ImportError:
-    comm = None
-
 convert_ctrees_to_h5(args.filenames, outputdir=args.outputdir,
+                     output_filebase=args.output_filebase,
                      write_halo_props_cont=args.write_halo_props_cont,
                      comm=comm, show_progressbar=args.show_progressbar)
