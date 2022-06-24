@@ -868,9 +868,15 @@ def update_container_h5_file(fname, h5files,
                     hf_task.attrs['consistent-trees-type'] = 'standard'
                 else:
                     hf_task.attrs['consistent-trees-type'] = 'parallel'
-                hf_task.attrs['container-filename'] = np.string_(fname)
+
+                # Relative path going *from* data file *to* container file
+                relpath = os.path.relpath(fname, start=os.path.dirname(outfile))
+                hf_task.attrs['container-filename'] = np.string_(relpath)
+
                 for (out, inp) in attr_props:
                     hf['/'].attrs[out] += hf_task['/'].attrs[inp]
+
+            # Relative path going *from* container file *to* data file
             relpath = os.path.relpath(outfile, start=os.path.dirname(fname))
             hf[f'File{ifile}'] = h5py.ExternalLink(relpath, '/')
     return
