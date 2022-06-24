@@ -106,3 +106,6 @@ venv.bak/
 
 # emacs backup files
 *.*~
+*.ascii
+*.h5
+.vscode/settings.json

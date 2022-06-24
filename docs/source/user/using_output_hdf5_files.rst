@@ -114,5 +114,6 @@ association between the halos. Therefore, the halos can be processed either comp
 
    </details>
 
-.. note:: The Uchuu halo catalogues were generated with an earlier version of the uchuutools script and you will
-          need to set the ``named_data_group='/'`` parameter when reading the halo catalogues.
+.. note::
+      The Uchuu halo catalogues were generated with an earlier version of the uchuutools script and you will
+      need to set the ``named_data_group='/'`` parameter when reading the halo catalogues.
