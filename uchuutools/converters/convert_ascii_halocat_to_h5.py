@@ -1,11 +1,10 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
 __author__ = "Manodeep Sinha"
 __all__ = ["convert_halocat_to_h5"]
 
 import os
 
+from ..__version__ import __version__
 from ..utils import get_parser, get_approx_totnumhalos, generic_reader,\
                     get_metadata, resize_halo_datasets, write_halos
 
@@ -92,8 +91,8 @@ def _convert_single_halocat(input_file, rank,
         raise ValueError(msg)
 
     if chunksize < 1:
-        print(f"Warning: chunksize (the number of lines read in one "
-              f"shot = '{chunksize}' must be at least 1")
+        msg = f"Error: chunksize (the number of lines read in one "\
+              f"shot = '{chunksize}' must be at least 1"
         raise ValueError(msg)
 
     print(f"[Rank={rank}]: processing file '{input_file}'...")
@@ -134,12 +133,14 @@ def _convert_single_halocat(input_file, rank,
         redshift = 1.0/scale_factor - 1.0
 
         # give the HDF5 root some attributes
+        hf.attrs[u"version"] = __version__
         hf.attrs[u"input_filename"] = np.string_(input_file)
         hf.attrs[u"input_filedatestamp"] = np.array(os.path.getmtime(input_file))
         hf.attrs[u"input_catalog_type"] = np.string_(input_catalog_type)
         hf.attrs[f"{input_catalog_type}_version"] = np.string_(version_info)
         hf.attrs[f"{input_catalog_type}_columns"] = np.string_(hdrline)
         hf.attrs[f"{input_catalog_type}_metadata"] = np.string_(metadata)
+        hf.attrs['contiguous-halo-props'] = write_halo_props_cont
         sim_grp = hf.create_group('simulation_params')
         simulation_params = metadata_dict['simulation_params']
         for k, v in simulation_params.items():
@@ -223,6 +224,7 @@ def _convert_single_halocat(input_file, rank,
 
         hf.attrs['TotNhalos'] = halos_offset
         if show_progressbar:
+            pbar.total = halos_offset
             pbar.close()
 
     totnumhalos = halos_offset

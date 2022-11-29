@@ -7,7 +7,8 @@ Provides several utility functions.
 """
 
 __author__ = "Manodeep Sinha"
-__all__ = ["get_parser", "get_approx_totnumhalos", "generic_reader",
+__all__ = ["get_parser", "get_approx_totnumhalos",
+           "generic_reader", "generic_h5_file_opener",
            "get_metadata", "resize_halo_datasets",
            "check_and_decompress", "distribute_array_over_ntasks",
            "check_for_contiguous_halos",
@@ -234,6 +235,99 @@ def generic_reader(filename, mode='rt'):
     f.close()
 
 
+@contextmanager
+def generic_h5_file_opener(filename_or_handle, mode='r'):
+    """
+    Returns a ``h5py.File`` object for reading hdf5 files.
+
+    Parameters
+    -----------
+
+    filename_or_handle: string or ``h5py.File`` object, required
+        The hdf5 filename or an already open ``h5py.File`` object.
+        If a filename is passed, then the file will be opened for
+        reading and the file handle will be returned. This newly
+        open file handle will be closed once the calling function
+        ends.
+
+        If an open file handle is passed, and the file supports the
+        requested ``mode``, then file handle will be passed as is.
+
+    mode: string, optional, default = 'r'
+        The requested file access mode. If the file is opened, then
+        this mode is used. If a file handle is passed, then the
+        function raises a ValueError if the file handle does not
+        support the requested access mode. This error can only occur
+        when the file was opened as read-only but both read-write
+        access was requested through ``mode``.
+
+    Returns
+    --------
+
+    hf: an ``h5py`` file handle, generator
+        Yields an ``h5py.File`` object that is suitable for use
+        in ``with`` statements, e.g.,
+        ``with generic_h5_file_reader(<fname_or_handle>) as hf:``
+
+    """
+    import h5py
+
+    valid_modes_and_h5_modes = {'r': 'r',  # read-only
+                                'r+': 'r+',  # read + write
+                                'w': 'r+',  # read + write, truncate existing
+                                'w-': 'r+',  # read + write, fail if file exists
+                                'x': 'r+',  # read + write, fail if file exists (same as w-)
+                                'a': 'r+'}  # read + write (same as r+)
+
+    try:
+        valid_modes_and_h5_modes[mode]
+    except KeyError:
+        msg = f"Error: File access mode = {mode} is not supported. Valid "\
+              f"file access modes are: {valid_modes_and_h5_modes.keys()}"
+        raise ValueError(msg)
+
+    if isinstance(filename_or_handle, h5py.Group):
+        if not filename_or_handle:
+            msg = "Error: File handle appears to be closed"
+            raise ValueError(msg)
+
+        file_mode = filename_or_handle.mode
+        # Really the only possible case for failure is that
+        # the user has requested 'r+' (read + write)
+        # but the file was opened with 'r' (read only) - MS 26/03/2021
+        if valid_modes_and_h5_modes[mode] not in file_mode:
+            msg = f"Error: File was opened with mode {file_mode}, "\
+                  f"and does not contain the requested mode = {mode}"
+            raise ValueError(msg)
+
+        yield filename_or_handle
+    else:
+
+        # While it is tempting to check for ``str`` or other valid
+        # types for a valid first parameter to ``h5py.File``, this will
+        # need constant updating as ``h5py.File`` accepts more kinds of
+        # filename/file-like objects. Better to let ``h5py.File`` decide
+        # whether or not it's a valid - MS 27/03/2021
+        try:
+            hf = h5py.File(filename_or_handle, mode)
+        except TypeError as e:
+            msg = f"Error: The parameter {filename_or_handle} must be "\
+                  "allowed by ``h5py.File`` (usually or a string). The "\
+                  f"passed parameter has type = {type(filename_or_handle)}"
+            raise TypeError(msg) from e
+        except ValueError as e:
+            msg = f"Error: Looks like the file access mode = {mode} "\
+                  "is not allowed by ``h5py.File``. This should have "\
+                  "been checked previously - please report this error "\
+                  "as an issue on the GitHub repo - "\
+                  "https://github.com/uchuuproject/uchuutools/"
+            raise ValueError(msg) from e
+        else:
+            yield hf
+        finally:
+            hf.close()
+
+
 def get_metadata(input_file):
     """
     Returns metadata information for ``input_file``. Includes all
@@ -360,7 +454,16 @@ def get_simulation_params_from_metadata(metadata):
 
         # box size
         elif "Full box size" in line or "Box size" in line:
-            pars = line.split("=")[1].strip().split()
+            try:
+                pars = line.split("=")[1].strip().split()
+            except IndexError:
+                pars = line.split(":")[1].strip().split()
+            else:
+                msg = f"Error: Could not parse the box size "\
+                      f"from the input file line = '{line}'.\n"\
+                      f"Expected the line to contain '=' or ':'"
+                raise ValueError(msg)
+
             box = float(pars[0])
             simulation_params['Boxsize'] = box
 
@@ -603,13 +706,14 @@ def check_for_contiguous_halos(h5_task_file, write_halo_props_cont):
         if hf.attrs['contiguous-halo-props'] != write_halo_props_cont:
             msg = "Error: Found incompatible option for writing contiguous "\
                   f"halo properties when appending to the hdf5 file = {h5_task_file}. "\
-                  "The hdf5 file was created with "\
-                  f"``write_halo_props_cont={hf.attrs['contiguous-halo-props']}`` "\
-                  f"but the current request is with ``write_halo_props_cont={write_halo_props_cont}``.\n"\
-                  f"You can fix this either by setting "\
-                  f"``write_halo_props_cont={hf.attrs['contiguous-halo-props']}``"\
-                  f"or by setting ``truncate=True`` (but that will "\
-                   "over-write the existing file)."
+                  "The hdf5 file was created with contiguous halo properties "\
+                  f"= ``{hf.attrs['contiguous-halo-props']}`` but the "\
+                  "current request conflicts with "\
+                  f"``write_halo_props_cont={write_halo_props_cont}``.\n"\
+                  "You can fix this either by setting ``write_halo_props_cont"\
+                  f"={hf.attrs['contiguous-halo-props']}`` or by setting "\
+                  "``truncate=True`` (but that will over-write the "\
+                  "existing file)."
             raise ValueError(msg)
 
     return True
@@ -733,11 +837,12 @@ def update_container_h5_file(fname, h5files,
     Returns ``True`` on successful completion of the write
 
     """
+    import os
     import h5py
 
     outfiles = h5files
     if not isinstance(h5files, (list, tuple)):
-        outfiles = [h5files]
+        outfiles = (h5files, )
 
     try:
         with h5py.File(fname, 'r') as hf:
@@ -763,8 +868,15 @@ def update_container_h5_file(fname, h5files,
                     hf_task.attrs['consistent-trees-type'] = 'standard'
                 else:
                     hf_task.attrs['consistent-trees-type'] = 'parallel'
+
+                # Relative path going *from* data file *to* container file
+                relpath = os.path.relpath(fname, start=os.path.dirname(outfile))
+                hf_task.attrs['container-filename'] = np.string_(relpath)
+
                 for (out, inp) in attr_props:
                     hf['/'].attrs[out] += hf_task['/'].attrs[inp]
 
-            hf[f'File{ifile}'] = h5py.ExternalLink(outfile, '/')
+            # Relative path going *from* container file *to* data file
+            relpath = os.path.relpath(outfile, start=os.path.dirname(fname))
+            hf[f'File{ifile}'] = h5py.ExternalLink(relpath, '/')
     return

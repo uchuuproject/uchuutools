@@ -1,9 +1,14 @@
 .. _data_formats:
 
-#########################
-HDF5 Output Data Format
-#########################
+##########################
+HDF5 Output File Formats
+##########################
 
+This tool can convert ascii Consistent-Trees mergertree files *and* ascii Rockstar/Consistent-Trees halo catalogs into a hdf5 format. Since the mergertree and halo catalogs are conceptually different, these two formats are described separately.
+
+***********************************************
+HDF5 Mergertree Data Format (Consistent-Trees)
+***********************************************
 
 Within the following sections we will assume that the generated hdf5 file has been opened with the following code:
 
@@ -17,15 +22,15 @@ Within the following sections we will assume that the generated hdf5 file has be
     hf = h5py.File(h5_filename, 'r')
 
 Consistent-Trees HDF5 format for Tree catalogues
-*************************************************
+=================================================
 
 The Consistent-Trees tree hdf5 format consists of two types of files:
 
 #. one container hdf5 file,
-#. one or more hdf5 files that contain the forest/tree/halo level information (we will refer to this as ``hdf5-treecat`` file)
+#. one or more hdf5 files that contain the forest/tree/halo level information (we will refer to this as ``hdf5-treedata`` file)
 
 Container HDF5 file format
-===========================
+--------------------------
 
 The following attributes of the container hdf5 file may be useful to the user:
 
@@ -54,90 +59,95 @@ hdf5 file under ``File<ifile>``, where ``ifile`` ranges from ``[0, Nfiles)``. Us
 
 .. code-block:: python
 
-    def update_container_h5_file(fname, h5files,
-                                standard_consistent_trees=True):
-        """
-        Writes the container hdf5 file that has external links to
-        the hdf5 datafiles with the mergertree information.
+        def update_container_h5_file(fname, h5files,
+                                    standard_consistent_trees=True):
+            """
+            Writes the container hdf5 file that has external links to
+            the hdf5 datafiles with the mergertree information.
 
-        Parameters
-        -----------
+            Parameters
+            -----------
 
-        fname: string, required
-            The name of the output container file (usually ``forest.h5``). A
-            new file is always created, however, if the file ``fname`` previously
-            existed then the external links are preserved.
+            fname: string, required
+                The name of the output container file (usually ``forest.h5``). A
+                new file is always created, however, if the file ``fname`` previously
+                existed then the external links are preserved.
 
-        h5files: list of filenames, required
-            The list of filenames that were either newly created or updated.
+            h5files: list of filenames, required
+                The list of filenames that were either newly created or updated.
 
-            If the container file ``fname`` exists, then the union of the filenames
-            that already existed in ``fname`` and ``h5files`` will be used to
-            create the external links
+                If the container file ``fname`` exists, then the union of the filenames
+                that already existed in ``fname`` and ``h5files`` will be used to
+                create the external links
 
-        standard_consistent_tree: boolean, optional, default: True
-            Specifies whether the input files were from a parallel
-            Consistent-Trees code or the standard Consistent-Trees code. Assumed
-            to be standard (i.e., the public version) of the Consistent-Trees
-            catalog
+            standard_consistent_tree: boolean, optional, default: True
+                Specifies whether the input files were from a parallel
+                Consistent-Trees code or the standard Consistent-Trees code. Assumed
+                to be standard (i.e., the public version) of the Consistent-Trees
+                catalog
 
-        Returns
-        -------
+            Returns
+            -------
 
-        Returns ``True`` on successful completion of the write
+            Returns ``True`` on successful completion of the write
 
-        """
-        import h5py
+            """
+            import os
+            import h5py
 
-        outfiles = h5files
-        if not isinstance(h5files, (list, tuple)):
-            outfiles = [h5files]
+            outfiles = h5files
+            if not isinstance(h5files, (list, tuple)):
+                outfiles = (h5files, )
 
-        try:
-            with h5py.File(fname, 'r') as hf:
-                nfiles = hf['/'].attrs['Nfiles']
-                for ifile in range(nfiles):
-                    outfiles.append(hf[f'File{ifile}'].file)
-        except OSError:
-            pass
+            try:
+                with h5py.File(fname, 'r') as hf:
+                    nfiles = hf['/'].attrs['Nfiles']
+                    for ifile in range(nfiles):
+                        outfiles.append(hf[f'File{ifile}'].file)
+            except OSError:
+                pass
 
-        outfiles = set(outfiles)
-        nfiles = len(outfiles)
-        with h5py.File(fname, 'w') as hf:
-            hf['/'].attrs['Nfiles'] = nfiles
-            hf['/'].attrs['TotNforests'] = 0
-            hf['/'].attrs['TotNtrees'] = 0
-            hf['/'].attrs['TotNhalos'] = 0
-            attr_props = [('TotNforests', 'Nforests'),
-                        ('TotNtrees', 'Ntrees'),
-                        ('TotNhalos', 'Nhalos')]
-            for ifile, outfile in enumerate(outfiles):
-                with h5py.File(outfile, 'a') as hf_task:
-                    if standard_consistent_trees:
-                        hf_task.attrs['consistent-trees-type'] = 'standard'
-                    else:
-                        hf_task.attrs['consistent-trees-type'] = 'parallel'
-                    for (out, inp) in attr_props:
-                        hf['/'].attrs[out] += hf_task['/'].attrs[inp]
+            outfiles = set(outfiles)
+            nfiles = len(outfiles)
+            with h5py.File(fname, 'w') as hf:
+                hf['/'].attrs['Nfiles'] = nfiles
+                hf['/'].attrs['TotNforests'] = 0
+                hf['/'].attrs['TotNtrees'] = 0
+                hf['/'].attrs['TotNhalos'] = 0
+                attr_props = [('TotNforests', 'Nforests'),
+                            ('TotNtrees', 'Ntrees'),
+                            ('TotNhalos', 'Nhalos')]
+                for ifile, outfile in enumerate(outfiles):
+                    with h5py.File(outfile, 'a') as hf_task:
+                        if standard_consistent_trees:
+                            hf_task.attrs['consistent-trees-type'] = 'standard'
+                        else:
+                            hf_task.attrs['consistent-trees-type'] = 'parallel'
+                        hf_task.attrs['container-filename'] = np.string_(fname)
+                        for (out, inp) in attr_props:
+                            hf['/'].attrs[out] += hf_task['/'].attrs[inp]
+                    relpath = os.path.relpath(outfile, start=os.path.dirname(fname))
+                    hf[f'File{ifile}'] = h5py.ExternalLink(relpath, '/')
+            return
 
-                hf[f'File{ifile}'] = h5py.ExternalLink(outfile, '/')
-        return
 
 .. raw:: html
 
    </details>
 
-HDF5-treecat file format
-==========================
+hdf5-treedata file format
+--------------------------
 
-There may be one or more hdf5 data-files written as part of the conversion process. These files contain the actual halo information, as well as tree-level and forest-level information contained in the original ascii Consistent-Trees tree catalogues. In this section, we will describe this ``hdf5-treecat`` file format.
+There may be one or more hdf5 data-files written as part of the conversion process. These files contain the actual halo information, as well as tree-level and forest-level information contained in the original ascii Consistent-Trees tree catalogues. In this section, we will describe this ``hdf5-treedata`` file format.
 
-.. note:: The total number of hdf5 data-files associated with the container file is simply the number of parallel tasks used during the ascii->hdf5 conversion. For serial conversions, there will be *exactly* one hdf5 data-file (by defaut, named ``./forest_0.h5``)
+.. note::
+        The total number of hdf5 data-files associated with the container file is simply the number of parallel tasks used during the ascii->hdf5 conversion. For serial conversions, there will be *exactly* one hdf5 data-file (by defaut, named ``./forest_0.h5``)
 
 
 File-level Attributes (``list(hf.attrs)``)
--------------------------------------------
-The ``hdf5-treecat`` file has attributes at the root-level to store metadata about the input ascii Consistent-trees catalogues. The following attributes of the container hdf5 file facilitate reading the hdf5 file:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ``hdf5-treedata`` file has attributes at the root-level to store metadata about the input ascii Consistent-trees catalogues. The following attributes of the container hdf5 file facilitate reading the hdf5 file:
 
 #. **Nforests**: Total number of forests stored in this file(``np.int64``)
 #. **Ntrees**: Total number of trees stored in this file (``np.int64``)
@@ -188,7 +198,7 @@ The ``hdf5-treecat`` file has attributes at the root-level to store metadata abo
 
 
 Halo-level info (``hf['Forests']``)
-------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Halos are written under a ``Forests`` group within the hdf5 file. If each selected halo property is written separately (i.e., with the default option of ``write_halo_props_cont=True``), then individual halo properties are written as a separate dataset as ``Forests/<property_name>`` (e.g., ``Forests/M200c``). If all selected properties of a halo are written contiguously (i.e., with the user-specified option of ``write_halo_props_cont=False``), then the halos are written as a single dataset ``Forests/halos``.
 
@@ -238,7 +248,7 @@ By design, the halo properties are written as chunked and compressed. If you pla
 
 
 .. note::
-    Any special characters in the Consistent-Trees halo property name are replaced with a single underscore ``_``. For example, ``A[x](500c)`` in the input ascii file is written as ``A_x_500c`` in the hdf5 file. This name conversion is done by the function :func:`uchuutools.utils.sanitize_ctrees_header`.
+        Any special characters in the Consistent-Trees halo property name are replaced with a single underscore ``_``. For example, ``A[x](500c)`` in the input ascii file is written as ``A_x_500c`` in the hdf5 file. This name conversion is done by the function :func:`uchuutools.utils.sanitize_ctrees_header`.
 
 .. raw:: html
 
@@ -266,7 +276,7 @@ By design, the halo properties are written as chunked and compressed. If you pla
 
 
 Forest-level info (``hf['Forestinfo]``)
-----------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Since all halos from the same forest are written contiguously, the forest level info is there to allow easy access to entire forests. This info is stored in the dataset ``ForestInfo`` and contains the following fields:
 
@@ -297,7 +307,7 @@ The number of entries in this ``ForestInfo`` dataset (i.e., the shape) equals th
 
 
 Tree-level info (``hf['TreeInfo']``)
--------------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Since the halos are stored on a **per tree** basis in the input ascii Consistent-Trees catalogue, data provenance requires that we store that original information at a tree level as well. In addition, this allows us to quickly read a single tree for visualisation/testing (rather than the entire forest). This info is stored in the dataset ``TreeInfo`` and contains the following fields:
 
@@ -341,18 +351,18 @@ Fields prefixed with ``Input_`` are there solely for tracking back to the origin
 ------------
 
 
-Rockstar/Consistent-Trees HDF5 format for halo catalogues
-**********************************************************
+****************************************************************
+HDF5 Rockstar/Consistent-Trees Halo Catalogs Output File Format
+****************************************************************
+
 Each Rockstar ``out_*.list``, or Consistent-Trees ``hlist_*.list`` files is converted
 into a single hdf5 file (``hdf5-halocat`` file). The halos in the hdf5 files are written
 in the exact same order as the input ascii files.
 
-HDF5-halocat file format
-==========================
-
 File-level Attributes
-----------------------
-The ``hdf5-halocat`` file has attributes at the root-level to store metadata about the input ascii Consistent-trees catalogues. The following attributes of the container hdf5 file facilitate reading the hdf5 file:
+======================
+
+The ``hdf5-halocat`` file has attributes at the root-level to store metadata about the input ascii halo catalogues. The following attributes of the container hdf5 file facilitate reading the hdf5 file:
 
 #. **TotNhalos**: Total number of halos stored in this file (``np.int64``)
 #. **scale\_factor**: Total number of forests stored in this file(``np.float``)
@@ -396,8 +406,8 @@ The ``hdf5-halocat`` file has attributes at the root-level to store metadata abo
 
 
 Halo-level info
------------------
-
+=================
+The ``hdf5-halocat`` file can have any number of halo properties that were present in the input ascii halo catalogs and were converted into the hdf5 file. Please refer to the metadata (directly carried through from the input asii halo catalog) in the header attributes to obtain more information about the halo properties.
 
 .. raw:: html
 

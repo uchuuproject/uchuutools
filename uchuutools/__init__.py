@@ -28,10 +28,12 @@ Available modules
 from .__version__ import __version__
 from . import converters, ctrees_utils, utils
 from .converters import *
+from .readers import *
 
 # All declaration
-__all__ = ['converters', 'ctrees_utils', 'utils']
+__all__ = ['converters', 'readers', 'ctrees_utils', 'utils', ]
 __all__.extend(converters.__all__)
+__all__.extend(readers.__all__)
 
 # Author declaration
 __author__ = "Manodeep Sinha (@manodeep)"

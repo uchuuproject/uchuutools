@@ -26,6 +26,7 @@ The documentation of *uchuutools* is spread out over several sections:
 
     user/getting_started
     user/data_formats
+    user/using_output_hdf5_files
     community_guidelines
 
 .. _api-docs:
@@ -35,6 +36,7 @@ The documentation of *uchuutools* is spread out over several sections:
     :caption: API Reference
 
     api/uchuutools.converters
+    api/uchuutools.readers
     api/uchuutools.ctrees_utils
     api/uchuutools.utils
 
